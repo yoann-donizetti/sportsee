@@ -56,11 +56,11 @@ MISTRAL_API_KEY=votre_clé_api_mistral
 ├── MistralChat.py          # Application Streamlit principale
 ├── indexer.py              # Script pour indexer les documents
 ├── inputs/                 # Dossier pour les documents sources
-├── vector_db/              # Dossier pour l'index FAISS et les chunks
+├── vector_db/              # Dossier généré automatiquement (non versionné)
 ├── database/               # Base de données SQLite pour les interactions
 └── utils/                  # Modules utilitaires
     ├── config.py           # Configuration de l'application
-    ├── database.py         # Gestion de la base de données
+    ├── data_loader.py      # Chargement et parsing des documents
     └── vector_store.py     # Gestion de l'index vectoriel
 
 ```
@@ -74,8 +74,6 @@ Placez vos documents dans le dossier `inputs/`. Les formats supportés sont :
 - TXT
 - DOCX
 - CSV
-- JSON
-
 Vous pouvez organiser vos documents dans des sous-dossiers pour une meilleure organisation.
 
 ### 2. Indexer les documents
@@ -118,12 +116,13 @@ Détermine si une requête nécessite une recherche RAG :
 - Classification avec le modèle Mistral
 - Détection des questions spécifiques vs générales
 
-### `utils/database.py`
+### `utils/data_loader.py`
 
-Gère la base de données SQLite pour les interactions :
-- Enregistrement des questions et réponses
-- Stockage des feedbacks utilisateurs
-- Récupération des statistiques
+Gère le chargement et le parsing des données :
+- Extraction de texte à partir de différents formats (PDF, TXT, DOCX, CSV, Excel)
+- Gestion d’un fallback OCR pour les PDF scannés (EasyOCR)
+- Organisation des documents avec métadonnées (source, catégorie, chemin)
+- Préparation des données pour le pipeline RAG
 
 ## Personnalisation
 
