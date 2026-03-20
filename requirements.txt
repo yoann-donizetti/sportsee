@@ -1,15 +1,32 @@
-streamlit==1.44.1
-mistralai==0.4.2
-langchain==0.3.23
-faiss-cpu==1.10.0
-PyPDF2==3.0.1
-python-docx==1.1.2
-pandas==2.2.3
-openpyxl==3.1.5
-python-dotenv==1.1.0
-requests==2.32.3
-streamlit-feedback==0.1.4
-pymupdf>=1.22.0
-pillow>=9.0.0
-easyocr
-tqdm
+# --- Interface utilisateur ---
+streamlit==1.44.1          # Interface web pour le chatbot (MistralChat.py)
+
+# --- LLM Mistral ---
+mistralai==0.4.2           # API Mistral (chat + embeddings) (vector_store.py, MistralChat.py)
+
+# --- RAG / traitement texte ---
+langchain==0.3.23          # Chunking des documents (RecursiveCharacterTextSplitter) (vector_store.py)
+
+# --- Vector store ---
+faiss-cpu==1.10.0          # Index vectoriel pour recherche sémantique (vector_store.py)
+
+# --- Parsing des documents ---
+PyPDF2==3.0.1              # Extraction texte PDF standard (data_loader.py)
+pymupdf>=1.22.0            # Extraction PDF avancée (OCR fallback) (data_loader.py)
+python-docx==1.1.2         # Lecture fichiers DOCX (data_loader.py)
+
+# --- OCR ---
+pillow>=9.0.0              # Manipulation images pour OCR (data_loader.py)
+easyocr                    # OCR sur PDF scannés (data_loader.py)
+
+# --- Données tabulaires ---
+pandas==2.2.3              # Lecture CSV et Excel (data_loader.py)
+openpyxl==3.1.5            # Support Excel pour pandas (data_loader.py)
+
+# --- Utilitaires ---
+numpy==2.2.3               # Traitement des embeddings et images OCR (data_loader.py, vector_store.py)
+requests==2.32.3           # Téléchargement des données (data_loader.py)
+tqdm                       # Barre de progression (data_loader.py)
+
+# --- Configuration ---
+python-dotenv==1.1.0       # Gestion des variables d’environnement (.env) (config.py)
