@@ -4,45 +4,44 @@ env/
 ENV/
 .venv/
 
-# Fichiers de configuration contenant des informations sensibles
+# Fichiers sensibles
 .env
 
-# Fichiers générés
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# Fichiers de logs
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs
 *.log
 logs/
 
-# Fichiers temporaires
-.DS_Store
-.idea/
+# IDE
 .vscode/
+.idea/
+
+# Temp
+.DS_Store
 *.swp
 *.swo
 *~
 
-# Fichiers de données
+# Data (si ajout futur)
 data/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Vector DB (RAG)
+vector_db/
+*.pkl
+*.idx
+
+# Database
+*.sqlite
+*.db
+
+# Jupyter
+.ipynb_checkpoints/
