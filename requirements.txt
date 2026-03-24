@@ -6,6 +6,7 @@ mistralai==0.4.2           # API Mistral (chat + embeddings) (vector_store.py, M
 
 # --- RAG / traitement texte ---
 langchain==0.3.23          # Chunking des documents (RecursiveCharacterTextSplitter) (vector_store.py)
+langchain-mistralai==0.2.4 # ragas LLM wrapper pour Mistral (evaluate_ragas.py)
 
 # --- Vector store ---
 faiss-cpu==1.10.0          # Index vectoriel pour recherche sémantique (vector_store.py)
@@ -30,3 +31,9 @@ tqdm                       # Barre de progression (data_loader.py)
 
 # --- Configuration ---
 python-dotenv==1.1.0       # Gestion des variables d’environnement (.env) (config.py)
+
+
+#  Evaluation RAG (RAGAS)
+ragas==0.1.7
+datasets==2.19.0
+pydantic>=2.6,<3

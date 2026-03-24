@@ -38,3 +38,23 @@ DATABASE_URL = f"sqlite:///{DATABASE_FILE}" # URL pour SQLAlchemy
 # --- Configuration de l'Application ---
 APP_TITLE = "NBA Analyst AI"
 NAME = "NBA" # Nom à personnaliser dans l'interface
+
+#Constants pour l'évaluation RAG
+EVALUATE_DIR = "evaluate"
+EVALUATE_DATASETS_DIR = os.path.join(EVALUATE_DIR, "datasets")
+RAG_EVAL_DATASET_FILE = os.path.join(EVALUATE_DATASETS_DIR, "rag_eval_dataset.json")
+
+# --- Configuration RAGAS (évaluation) ---
+
+# Dossier résultats
+RAGAS_RESULTS_DIR = os.path.join(EVALUATE_DIR, "results")
+
+# Fichiers de sortie
+RAGAS_RESULTS_CSV_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas_results.csv")
+RAGAS_SUMMARY_JSON_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas_summary.json")
+
+# Logs
+RAGAS_LOG_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas.log")
+
+# Paramètres évaluation
+RAGAS_SEARCH_K = 5  # nombre de documents récupérés pendant l’évaluation
