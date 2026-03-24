@@ -25,7 +25,7 @@ openpyxl==3.1.5            # Support Excel pour pandas (data_loader.py)
 
 # --- Utilitaires ---
 numpy==2.2.3               # Traitement des embeddings et images OCR (data_loader.py, vector_store.py)
-requests==2.32.3           # Téléchargement des données (data_loader.py)
+requests==2.32.4           # Téléchargement des données (data_loader.py)
 tqdm                       # Barre de progression (data_loader.py)
 
 # --- Configuration ---
