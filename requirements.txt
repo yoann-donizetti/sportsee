@@ -119,3 +119,12 @@ pydantic>=2.6,<3
 # Validation de schémas de données :
 # - utilisé par LangChain et RAGAS
 # - version 2 obligatoire pour compatibilité récente
+
+# =========================================================
+# Observabilité / Debug pipeline RAG
+# =========================================================
+logfire
+# Monitoring et traçabilité du pipeline RAG :
+# - visualisation des étapes (retrieval, prompt, réponse)
+# - debug des appels LLM
+# - utile pour audit et compréhension du système
