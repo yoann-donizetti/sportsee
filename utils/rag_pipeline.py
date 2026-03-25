@@ -1,69 +1,46 @@
-# utils/rag_pipeline.py
-"""Ce module contient la logique de la pipeline RAG (Retrieval-Augmented Generation) pour l'application NBA Analyst AI.
-Il inclut les fonctions pour interagir avec le Vector Store, construire les prompts pour le LLM, et générer les réponses en appelant l'API Mistral.
-Note: Ce module est conçu pour être utilisé dans l'application Streamlit (MistralChat.py) et peut être testé indépendamment.
-Il gère également les cas où le Vector Store n'est pas disponible, en fournissant des réponses d'erreur appropriées.
-Liste des fonctions principales:
-- get_vector_store_manager(): Charge le VectorStoreManager, qui gère l'index Faiss et les chunks de documents.
-- generer_reponse(prompt_messages): Génère une réponse en appelant l'API Mistral avec les messages formatés.
-- construire_contexte(search_results): Construit une chaîne de contexte à partir des résultats de recherche du Vector Store.
-- construire_prompt(question, context_str): Construit le prompt final pour l'API Mistral en utilisant le System Prompt RAG.
-- poser_question(prompt, vector_store_manager, k): Exécute la logique RAG complète pour une question, en gérant la recherche, 
-  la construction du prompt et la génération de la réponse. Retourne la réponse ainsi que les éléments utiles pour l'évaluation.
+"""Pipeline RAG pour l'application NBA Analyst AI.
 
+Ce module contient la logique Retrieval-Augmented Generation (RAG) :
+- chargement du Vector Store ;
+- recherche des documents pertinents ;
+- construction du contexte ;
+- construction du prompt ;
+- appel au modèle Mistral pour générer une réponse.
+
+Il est utilisé par l'application principale et peut aussi servir
+pour les scripts d'évaluation.
 """
+
 import logging
+from typing import Optional
+
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 
-from .config import (
-    MISTRAL_API_KEY, MODEL_NAME, SEARCH_K, NAME
-)
+from .config import MISTRAL_API_KEY, MODEL_NAME, NAME, SEARCH_K
 from .vector_store import VectorStoreManager
 
-# --- Configuration du Logging ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # --- Configuration de l'API Mistral ---
-api_key = MISTRAL_API_KEY
-model = MODEL_NAME
-
-if not api_key:
-    raise ValueError("Erreur : Clé API Mistral non trouvée (MISTRAL_API_KEY). Veuillez la définir dans le fichier .env.")
+if not MISTRAL_API_KEY:
+    raise ValueError(
+        "Erreur : Clé API Mistral non trouvée (MISTRAL_API_KEY). "
+        "Veuillez la définir dans le fichier .env."
+    )
 
 try:
-    client = MistralClient(api_key=api_key)
-    logging.info("Client Mistral initialisé.")
+    client = MistralClient(api_key=MISTRAL_API_KEY)
+    logger.info("Client Mistral initialisé.")
 except Exception as e:
-    logging.exception("Erreur initialisation client Mistral")
-    raise RuntimeError(f"Erreur lors de l'initialisation du client Mistral : {e}") from e
+    logger.exception("Erreur initialisation client Mistral")
+    raise RuntimeError(
+        f"Erreur lors de l'initialisation du client Mistral : {e}"
+    ) from e
 
 
-# --- Chargement du Vector Store ---
-def get_vector_store_manager():
-    """Charge le VectorStoreManager, qui gère l'index Faiss et les chunks de documents.
-    return: VectorStoreManager ou None en cas d'erreur.
-    note: Cette fonction peut être mise en cache dans Streamlit pour éviter de recharger l'index à chaque interaction.
-    """
-    logging.info("Tentative de chargement du VectorStoreManager...")
-    try:
-        manager = VectorStoreManager()
-        # Vérifie si l'index a bien été chargé par le constructeur
-        if manager.index is None or not manager.document_chunks:
-            logging.error("Index Faiss ou chunks non trouvés/chargés par VectorStoreManager.")
-            return None
-        logging.info(f"VectorStoreManager chargé avec succès ({manager.index.ntotal} vecteurs).")
-        return manager
-    except FileNotFoundError:
-        logging.error("FileNotFoundError lors de l'init de VectorStoreManager.")
-        return None
-    except Exception as e:
-        logging.exception("Erreur chargement VectorStoreManager")
-        return None
-
-
-# --- Prompt Système pour RAG ---
-SYSTEM_PROMPT = f"""Tu es 'NBA Analyst AI', un assistant expert sur la ligue de basketball NBA.
+# --- Prompt système ---
+SYSTEM_PROMPT = f"""Tu es '{NAME} Analyst AI', un assistant expert sur la ligue de basketball NBA.
 Ta mission est de répondre aux questions des fans en animant le débat.
 
 ---
@@ -76,117 +53,180 @@ QUESTION DU FAN:
 RÉPONSE DE L'ANALYSTE NBA:"""
 
 
-# --- Fonctions ---
+def get_vector_store_manager() -> Optional[VectorStoreManager]:
+    """Charge le VectorStoreManager.
+
+    Returns:
+        Une instance de VectorStoreManager si le chargement réussit,
+        sinon None.
+
+    Notes:
+        Cette fonction peut être mise en cache côté application
+        pour éviter de recharger l'index à chaque interaction.
+    """
+    logger.info("Tentative de chargement du VectorStoreManager...")
+
+    try:
+        manager = VectorStoreManager()
+
+        if manager.index is None or not manager.document_chunks:
+            logger.error("Index Faiss ou chunks non trouvés/chargés par VectorStoreManager.")
+            return None
+
+        logger.info(
+            "VectorStoreManager chargé avec succès (%s vecteurs).",
+            manager.index.ntotal,
+        )
+        return manager
+
+    except FileNotFoundError:
+        logger.error("FileNotFoundError lors de l'initialisation de VectorStoreManager.")
+        return None
+    except Exception:
+        logger.exception("Erreur chargement VectorStoreManager")
+        return None
+
+
 def generer_reponse(prompt_messages: list[ChatMessage]) -> str:
-    """Génère une réponse en appelant l'API Mistral avec les messages formatés.
-    param prompt_messages: Liste de ChatMessage à envoyer à l'API Mistral.
-    return: La réponse textuelle générée par le modèle.
-    note: Cette fonction est séparée pour faciliter les tests unitaires et l'évaluation.
+    """Génère une réponse via l'API Mistral.
+
+    Args:
+        prompt_messages: Liste de messages à envoyer au modèle.
+
+    Returns:
+        La réponse texte générée par le modèle, ou un message d'erreur.
     """
     if not prompt_messages:
-        # Logique de sécurité pour éviter d'appeler l'API avec un prompt vide
-        logging.warning("Tentative de génération de réponse avec un prompt vide.")
+        logger.warning("Tentative de génération de réponse avec un prompt vide.")
         return "Je ne peux pas traiter une demande vide."
+
     try:
-        # Log de l'appel à l'API avec des détails sur le prompt (sans révéler de données sensibles)
-        logging.info(f"Appel à l'API Mistral modèle '{model}' avec {len(prompt_messages)} message(s).")
-        response = client.chat(
-            model=model,
-            messages=prompt_messages,
-            temperature=0.1,#temperature=0.1 pour des réponses plus précises et moins créatives, adapté pour une tâche d'analyse factuelle.
+        logger.info(
+            "Appel à l'API Mistral modèle '%s' avec %s message(s).",
+            MODEL_NAME,
+            len(prompt_messages),
         )
-        #Vérifie que la réponse contient des choix valides avant d'essayer d'y accéder
+
+        response = client.chat(
+            model=MODEL_NAME,
+            messages=prompt_messages,
+            temperature=0.1,
+        )
+
         if response.choices and len(response.choices) > 0:
-            logging.info("Réponse reçue de l'API Mistral.")
+            logger.info("Réponse reçue de l'API Mistral.")
             return response.choices[0].message.content
-        else:
-            logging.warning("L'API n'a pas retourné de choix valide.")
-            return "Désolé, je n'ai pas pu générer de réponse valide pour le moment."
+
+        logger.warning("L'API n'a pas retourné de choix valide.")
+        return "Désolé, je n'ai pas pu générer de réponse valide pour le moment."
+
     except Exception:
-        logging.exception("Erreur API Mistral pendant client.chat")
-        return "Je suis désolé, une erreur technique m'empêche de répondre. Veuillez réessayer plus tard."
+        logger.exception("Erreur API Mistral pendant client.chat")
+        return (
+            "Je suis désolé, une erreur technique m'empêche de répondre. "
+            "Veuillez réessayer plus tard."
+        )
 
 
 def construire_contexte(search_results: list[dict]) -> str:
-    """
-    Construit une chaîne de contexte à partir des résultats de recherche du Vector Store.
-    Chaque résultat est formaté pour inclure la source, le score de similarité et un extrait du contenu.
-    return: Une chaîne de texte formatée pour être incluse dans le prompt du LLM
-    param search_results: Liste de résultats de recherche,
-    où chaque résultat est un dict contenant au moins 'metadata', 'score' et 'text'.
-    """
-    context_str = "\n\n---\n\n".join([
-        f"Source: {res['metadata'].get('source', 'Inconnue')} (Score: {res['score']:.1f}%)\nContenu: {res['text']}"
-        for res in search_results
-    ])
+    """Construit la chaîne de contexte à partir des résultats de recherche.
 
+    Args:
+        search_results: Liste de résultats provenant du Vector Store.
+
+    Returns:
+        Une chaîne formatée pour être injectée dans le prompt.
+    """
     if not search_results:
-        context_str = "Aucune information pertinente trouvée dans la base de connaissances pour cette question."
+        return "Aucune information pertinente trouvée dans la base de connaissances pour cette question."
 
+    context_str = "\n\n---\n\n".join(
+        [
+            (
+                f"Source: {res['metadata'].get('source', 'Inconnue')} "
+                f"(Score: {res['score']:.1f}%)\n"
+                f"Contenu: {res['text']}"
+            )
+            for res in search_results
+        ]
+    )
     return context_str
 
 
 def construire_prompt(question: str, context_str: str) -> str:
-    """
-    Construit le prompt final pour l'API Mistral en utilisant le System Prompt RAG.
-    param question: La question posée par l'utilisateur.
-    param context_str: Le contexte formaté à inclure dans le prompt.
-    return SYSTEM_PROMPT.format(context_str=context_str, question=question)
+    """Construit le prompt final pour le modèle.
+
+    Args:
+        question: Question utilisateur.
+        context_str: Contexte récupéré depuis le Vector Store.
+
+    Returns:
+        Le prompt final formaté.
     """
     return SYSTEM_PROMPT.format(context_str=context_str, question=question)
 
 
-def poser_question(prompt: str, vector_store_manager=None, k: int = SEARCH_K) -> dict:
-    """
-    Exécute la logique RAG complète pour une question.
-    param prompt: La question posée par l'utilisateur.
-    param vector_store_manager: Instance de VectorStoreManager pour effectuer la recherche. 
-    Si None, la fonction tentera de le charger elle-même.
-    param k: Le nombre de résultats à récupérer du Vector Store.
-    return: Un dict contenant la question, la réponse générée, les résultats de recherche, 
-    le contexte formaté, le prompt final pour le LLM et les messages envoyés à l'API.
-    note: Cette fonction encapsule toute la logique RAG, 
-    ce qui facilite les tests unitaires et la maintenance. 
-    Elle gère également les cas où le Vector Store n'est pas disponible.
+def poser_question(
+    prompt: str,
+    vector_store_manager: Optional[VectorStoreManager] = None,
+    k: int = SEARCH_K,
+) -> dict:
+    """Exécute la logique RAG complète pour une question.
+
+    Args:
+        prompt: Question posée par l'utilisateur.
+        vector_store_manager: Instance de VectorStoreManager.
+            Si None, la fonction tente de le charger.
+        k: Nombre de résultats à récupérer depuis le Vector Store.
+
+    Returns:
+        Un dictionnaire contenant :
+        - question
+        - answer
+        - search_results
+        - context_str
+        - final_prompt_for_llm
+        - messages_for_api
     """
     if vector_store_manager is None:
         vector_store_manager = get_vector_store_manager()
 
     if vector_store_manager is None:
-        logging.error("VectorStoreManager non disponible pour la recherche.")
+        logger.error("VectorStoreManager non disponible pour la recherche.")
         return {
             "question": prompt,
-            "answer": "Le service de recherche de connaissances n'est pas disponible. Impossible de traiter votre demande.",
+            "answer": (
+                "Le service de recherche de connaissances n'est pas disponible. "
+                "Impossible de traiter votre demande."
+            ),
             "search_results": [],
             "context_str": "",
             "final_prompt_for_llm": "",
-            "messages_for_api": []
+            "messages_for_api": [],
         }
 
-    # 1. Rechercher le contexte dans le Vector Store
     try:
-        logging.info(f"Recherche de contexte pour la question: '{prompt}' avec k={k}")
+        logger.info("Recherche de contexte pour la question: '%s' avec k=%s", prompt, k)
         search_results = vector_store_manager.search(prompt, k=k)
-        logging.info(f"{len(search_results)} chunks trouvés dans le Vector Store.")
+        logger.info("%s chunks trouvés dans le Vector Store.", len(search_results))
     except Exception:
-        logging.exception(f"Erreur pendant vector_store_manager.search pour la query: {prompt}")
+        logger.exception(
+            "Erreur pendant vector_store_manager.search pour la query: %s",
+            prompt,
+        )
         search_results = []
 
-    # 2. Formater le contexte pour le prompt LLM
     context_str = construire_contexte(search_results)
 
     if not search_results:
-        logging.warning(f"Aucun contexte trouvé pour la query: {prompt}")
+        logger.warning("Aucun contexte trouvé pour la query: %s", prompt)
 
-    # 3. Construire le prompt final
     final_prompt_for_llm = construire_prompt(prompt, context_str)
 
-    # 4. Créer la liste de messages pour l'API
     messages_for_api = [
         ChatMessage(role="user", content=final_prompt_for_llm)
     ]
 
-    # 5. Générer la réponse
     response_content = generer_reponse(messages_for_api)
 
     return {
@@ -195,5 +235,5 @@ def poser_question(prompt: str, vector_store_manager=None, k: int = SEARCH_K) ->
         "search_results": search_results,
         "context_str": context_str,
         "final_prompt_for_llm": final_prompt_for_llm,
-        "messages_for_api": messages_for_api
+        "messages_for_api": messages_for_api,
     }

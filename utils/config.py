@@ -1,60 +1,100 @@
-# utils/config.py
 import os
 from dotenv import load_dotenv
 
 # Charger les variables d'environnement du fichier .env
 load_dotenv()
 
-# --- Clé API ---
+# ======================================================
+# 🔐 API
+# ======================================================
+
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+
 if not MISTRAL_API_KEY:
-    print("⚠️ Attention: La clé API Mistral (MISTRAL_API_KEY) n'est pas définie dans le fichier .env")
-    # Vous pouvez choisir de lever une exception ici ou de continuer avec des fonctionnalités limitées
-    # raise ValueError("Clé API Mistral manquante. Veuillez la définir dans le fichier .env")
+    print("⚠️ Attention: MISTRAL_API_KEY non définie dans le fichier .env")
 
-# --- Modèles Mistral ---
+# ======================================================
+# 🤖 Modèles
+# ======================================================
+
 EMBEDDING_MODEL = "mistral-embed"
-MODEL_NAME = "mistral-small-latest" # Ou un autre modèle comme mistral-large-latest
+MODEL_NAME = "mistral-small-latest"
 
-# --- Configuration de l'Indexation ---
-# INPUT_DATA_URL = os.getenv("INPUT_DATA_URL") # Décommentez si vous utilisez une URL
-INPUT_DIR = "inputs"                # Dossier pour les données sources après extraction
-VECTOR_DB_DIR = "vector_db"         # Dossier pour stocker l'index Faiss et les chunks
+# ======================================================
+# 📁 Chemins globaux
+# ======================================================
+
+BASE_DIR = os.getcwd()
+
+INPUT_DIR = os.path.join(BASE_DIR, "inputs")
+VECTOR_DB_DIR = os.path.join(BASE_DIR, "vector_db")
+DATABASE_DIR = os.path.join(BASE_DIR, "database")
+EVALUATE_DIR = os.path.join(BASE_DIR, "evaluate")
+
+# ======================================================
+# 🧠 Vector Store / Indexation
+# ======================================================
+
 FAISS_INDEX_FILE = os.path.join(VECTOR_DB_DIR, "faiss_index.idx")
 DOCUMENT_CHUNKS_FILE = os.path.join(VECTOR_DB_DIR, "document_chunks.pkl")
 
-CHUNK_SIZE = 1500                   # Taille des chunks en *caractères* (vise ~512 tokens)
-CHUNK_OVERLAP = 150                 # Chevauchement en *caractères*
-EMBEDDING_BATCH_SIZE = 32           # Taille des lots pour l'API d'embedding
+CHUNK_SIZE = 1500
+CHUNK_OVERLAP = 150
+EMBEDDING_BATCH_SIZE = 32
 
-# --- Configuration de la Recherche ---
-SEARCH_K = 5                        # Nombre de documents à récupérer par défaut
+# ======================================================
+# 🔍 Recherche
+# ======================================================
 
-# --- Configuration de la Base de Données ---
-DATABASE_DIR = "database"
+SEARCH_K = 5
+DEFAULT_MIN_SCORE = None  # pour filtrage optionnel
+
+# ======================================================
+# 🗄️ Base de données
+# ======================================================
+
 DATABASE_FILE = os.path.join(DATABASE_DIR, "interactions.db")
-DATABASE_URL = f"sqlite:///{DATABASE_FILE}" # URL pour SQLAlchemy
+DATABASE_URL = f"sqlite:///{DATABASE_FILE}"
 
-# --- Configuration de l'Application ---
+# ======================================================
+# 🖥️ Application
+# ======================================================
+
 APP_TITLE = "NBA Analyst AI"
-NAME = "NBA" # Nom à personnaliser dans l'interface
+NAME = "NBA"
 
-#Constants pour l'évaluation RAG
-EVALUATE_DIR = "evaluate"
+# ======================================================
+# 📊 Évaluation (RAGAS)
+# ======================================================
+
 EVALUATE_DATASETS_DIR = os.path.join(EVALUATE_DIR, "datasets")
 RAG_EVAL_DATASET_FILE = os.path.join(EVALUATE_DATASETS_DIR, "rag_eval_dataset.json")
 
-# --- Configuration RAGAS (évaluation) ---
-
-# Dossier résultats
 RAGAS_RESULTS_DIR = os.path.join(EVALUATE_DIR, "results")
-
-# Fichiers de sortie
 RAGAS_RESULTS_CSV_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas_results.csv")
 RAGAS_SUMMARY_JSON_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas_summary.json")
-
-# Logs
 RAGAS_LOG_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas.log")
 
-# Paramètres évaluation
-RAGAS_SEARCH_K = 5  # nombre de documents récupérés pendant l’évaluation
+RAGAS_SEARCH_K = 5
+
+# ======================================================
+# 📄 Data Loader / Parsing
+# ======================================================
+
+OCR_LANGUAGES = ["en", "fr"]
+
+PDF_OCR_MIN_TEXT_LENGTH = 100
+PDF_OCR_ZOOM_X = 2
+PDF_OCR_ZOOM_Y = 2
+
+CSV_FALLBACK_ENCODING = "latin1"
+CSV_FALLBACK_SEPARATOR = ";"
+
+SUPPORTED_INPUT_EXTENSIONS = [
+    ".pdf",
+    ".docx",
+    ".txt",
+    ".csv",
+    ".xlsx",
+    ".xls",
+]
