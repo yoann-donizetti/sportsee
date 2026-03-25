@@ -1,39 +1,121 @@
-# --- Interface utilisateur ---
-streamlit==1.44.1          # Interface web pour le chatbot (MistralChat.py)
-
-# --- LLM Mistral ---
-mistralai==0.4.2           # API Mistral (chat + embeddings) (vector_store.py, MistralChat.py)
-
-# --- RAG / traitement texte ---
-langchain==0.3.23          # Chunking des documents (RecursiveCharacterTextSplitter) (vector_store.py)
-langchain-mistralai==0.2.4 # ragas LLM wrapper pour Mistral (evaluate_ragas.py)
-
-# --- Vector store ---
-faiss-cpu==1.10.0          # Index vectoriel pour recherche sémantique (vector_store.py)
-
-# --- Parsing des documents ---
-PyPDF2==3.0.1              # Extraction texte PDF standard (data_loader.py)
-pymupdf>=1.22.0            # Extraction PDF avancée (OCR fallback) (data_loader.py)
-python-docx==1.1.2         # Lecture fichiers DOCX (data_loader.py)
-
-# --- OCR ---
-pillow>=9.0.0              # Manipulation images pour OCR (data_loader.py)
-easyocr                    # OCR sur PDF scannés (data_loader.py)
-
-# --- Données tabulaires ---
-pandas==2.2.3              # Lecture CSV et Excel (data_loader.py)
-openpyxl==3.1.5            # Support Excel pour pandas (data_loader.py)
-
-# --- Utilitaires ---
-numpy==2.2.3               # Traitement des embeddings et images OCR (data_loader.py, vector_store.py)
-requests==2.32.3           # Téléchargement des données (data_loader.py)
-tqdm                       # Barre de progression (data_loader.py)
-
-# --- Configuration ---
-python-dotenv==1.1.0       # Gestion des variables d’environnement (.env) (config.py)
+# =========================================================
+# Interface utilisateur
+# =========================================================
+streamlit==1.44.1
+# Framework web léger pour exposer le chatbot RAG
+# (interface interactive utilisateur)
 
 
-#  Evaluation RAG (RAGAS)
+# =========================================================
+# LLM Mistral
+# =========================================================
+mistralai==0.4.2
+# SDK officiel Mistral :
+# - génération de réponses (chat completions)
+# - embeddings pour la recherche sémantique
+
+
+# =========================================================
+# RAG / orchestration LLM
+# =========================================================
+langchain==0.3.23
+# Framework d'orchestration LLM :
+# - découpage de documents (chunking)
+# - gestion des pipelines RAG
+
+langchain-mistralai==0.2.4
+# Intégration officielle Mistral dans LangChain :
+# - wrapper LLM
+# - utilisé notamment par RAGAS pour l'évaluation
+
+langchain-core==0.3.52
+# Cœur interne de LangChain :
+# - gestion des messages, prompts, callbacks
+# - nécessaire pour compatibilité avec les versions récentes
+
+
+# =========================================================
+# Vector store (recherche sémantique)
+# =========================================================
+faiss-cpu==1.10.0
+# Index vectoriel haute performance :
+# - stockage des embeddings
+# - recherche des chunks les plus proches (similarité)
+
+
+# =========================================================
+# Parsing de documents
+# =========================================================
+PyPDF2==3.0.1
+# Extraction texte simple depuis PDF
+
+pymupdf>=1.22.0
+# Extraction avancée (meilleure qualité + fallback OCR)
+
+python-docx==1.1.2
+# Lecture des fichiers Word (.docx)
+
+
+# =========================================================
+# OCR (documents scannés)
+# =========================================================
+pillow>=9.0.0
+# Manipulation d’images (préparation OCR)
+
+easyocr
+# OCR pour extraire du texte depuis images / PDF scannés
+
+
+# =========================================================
+# Données tabulaires
+# =========================================================
+pandas==2.2.3
+# Manipulation de données :
+# - CSV
+# - Excel
+# - DataFrame
+
+openpyxl==3.1.5
+# Backend Excel pour pandas
+
+
+# =========================================================
+# Utilitaires
+# =========================================================
+numpy==2.2.3
+# Calcul numérique :
+# - embeddings
+# - traitement vectoriel
+
+requests==2.32.3
+# Appels HTTP (API, téléchargement de données)
+
+tqdm
+# Barre de progression (utile pour pipeline data / indexing)
+
+
+# =========================================================
+# Configuration
+# =========================================================
+python-dotenv==1.1.0
+# Gestion des variables d’environnement (.env)
+# → API keys, configs, etc.
+
+
+# =========================================================
+# Évaluation RAG (RAGAS)
+# =========================================================
 ragas==0.1.7
+# Framework d’évaluation des systèmes RAG :
+# - faithfulness
+# - answer relevancy
+# - context precision / recall
+
 datasets==2.19.0
+# Format de dataset HuggingFace :
+# utilisé par RAGAS pour structurer les données
+
 pydantic>=2.6,<3
+# Validation de schémas de données :
+# - utilisé par LangChain et RAGAS
+# - version 2 obligatoire pour compatibilité récente

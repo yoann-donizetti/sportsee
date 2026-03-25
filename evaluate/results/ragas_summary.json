@@ -9,44 +9,44 @@
     "context_recall"
   ],
   "global_means": {
-    "faithfulness": 0.4407902886052645,
-    "answer_relevancy": 0.26349206348650794,
-    "context_precision": 0.4946818613279724,
-    "context_recall": 0.4724867724719577
+    "faithfulness": 0.52989232130099,
+    "answer_relevancy": 0.7874287848461538,
+    "context_precision": 0.30138888886409726,
+    "context_recall": 0.4861111111111111
   },
   "by_category_answerable_true": {
     "comparaison": {
-      "faithfulness": 0.1538,
-      "answer_relevancy": 0.3,
-      "context_precision": 1.0,
-      "context_recall": 0.5667
+      "faithfulness": 0.4263,
+      "answer_relevancy": 0.7421,
+      "context_precision": 0.2917,
+      "context_recall": 0.4167
     },
     "factuel_complexe": {
-      "faithfulness": 0.0,
-      "answer_relevancy": 0.0,
+      "faithfulness": 0.2808,
+      "answer_relevancy": 0.9148,
       "context_precision": 0.1667,
-      "context_recall": 0.3333
+      "context_recall": 0.5
     },
     "factuel_simple": {
-      "faithfulness": 0.6649,
-      "answer_relevancy": 0.1429,
-      "context_precision": 0.3694,
-      "context_recall": 0.5714
+      "faithfulness": 0.6119,
+      "answer_relevancy": 0.7393,
+      "context_precision": 0.45,
+      "context_recall": 0.6667
     },
     "subjectif": {
-      "faithfulness": 0.5,
-      "answer_relevancy": 0.6,
-      "context_precision": 0.4038,
-      "context_recall": 0.25
+      "faithfulness": 0.6366,
+      "answer_relevancy": 0.8499,
+      "context_precision": 0.0,
+      "context_recall": 0.0
     }
   },
   "answerable_true": {
     "n_questions": 12,
     "means": {
-      "faithfulness": 0.4407902886052645,
-      "answer_relevancy": 0.26349206348650794,
-      "context_precision": 0.4946818613279724,
-      "context_recall": 0.4724867724719577
+      "faithfulness": 0.52989232130099,
+      "answer_relevancy": 0.7874287848461538,
+      "context_precision": 0.30138888886409726,
+      "context_recall": 0.4861111111111111
     }
   },
   "answerable_false": {

@@ -17,26 +17,26 @@ from ragas import evaluate
 from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
 from ragas.llms import LangchainLLMWrapper
 from ragas.embeddings import LangchainEmbeddingsWrapper
-from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from evaluate.core.safe_mistral import SafeChatMistralAI
+from langchain_mistralai import MistralAIEmbeddings
 
 
 def get_ragas_llm(model_name: str, mistral_api_key: str) -> LangchainLLMWrapper:
     """
-    Instancie le LLM utilisé par RAGAS.
-     - model_name : Nom du modèle Mistral à utiliser comme judge.
-     - mistral_api_key : Clé API Mistral.
-     args :
-    - model_name : Nom du modèle Mistral à utiliser comme judge.
-     Returns:
-        LangchainLLMWrapper encapsulant le modèle Mistral spécifié.
-    raises:
-    RuntimeError: Si le modèle spécifié n'est pas disponible ou si la clé API est invalide.
+        Instancie le LLM utilisé par RAGAS pour évaluer les réponses.
 
-    """
+        Args:
+            model_name: Nom du modèle Mistral utilisé comme judge.
+            mistral_api_key: Clé API Mistral.
+
+        Returns:
+            Un wrapper RAGAS autour du modèle Mistral.
+        """
     return LangchainLLMWrapper(
-        ChatMistralAI(
+        SafeChatMistralAI(
             model=model_name,
             mistral_api_key=mistral_api_key,
+            temperature=0.0,
         )
     )
 
@@ -44,12 +44,12 @@ def get_ragas_llm(model_name: str, mistral_api_key: str) -> LangchainLLMWrapper:
 def get_ragas_embeddings(mistral_api_key: str) -> LangchainEmbeddingsWrapper:
     """
     Instancie les embeddings utilisés par RAGAS.
-    args :
-    - mistral_api_key : Clé API Mistral.
+
+    Args:
+        mistral_api_key: Clé API Mistral.
+
     Returns:
-    LangchainEmbeddingsWrapper encapsulant les embeddings Mistral.
-    raises:
-    RuntimeError: Si les embeddings ne sont pas disponibles ou si la clé API est invalide
+        Un wrapper RAGAS autour des embeddings Mistral.
     """
     return LangchainEmbeddingsWrapper(
         MistralAIEmbeddings(
@@ -127,6 +127,10 @@ def run_ragas(
         "context_recall": context_recall,
     }
 
+    invalid_metrics = [name for name in active_metrics if name not in metric_objects]
+    if invalid_metrics:
+        raise ValueError(f"Métriques inconnues : {invalid_metrics}")
+
     selected_metrics = [metric_objects[name] for name in active_metrics]
 
     rows_true = [row for row in rows if row["answerable"]]
@@ -145,13 +149,18 @@ def run_ragas(
         llm = get_ragas_llm(model_name=model_name, mistral_api_key=mistral_api_key)
         embeddings = get_ragas_embeddings(mistral_api_key=mistral_api_key)
 
-        result = evaluate(
-            dataset=ragas_dataset,
-            metrics=selected_metrics,
-            llm=llm,
-            embeddings=embeddings,
-            raise_exceptions=False,
-        )
+        try:
+            result = evaluate(
+                dataset=ragas_dataset,
+                metrics=selected_metrics,
+                llm=llm,
+                embeddings=embeddings,
+                raise_exceptions=False,
+            )
+        except Exception as e:
+            logging.exception("Erreur lors de l'évaluation RAGAS")
+            raise RuntimeError("Échec de l'évaluation RAGAS") from e
+
 
         ragas_df = result.to_pandas().reset_index(drop=True)
         meta_true_df = pd.DataFrame(rows_true).reset_index(drop=True)
