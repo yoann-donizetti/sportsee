@@ -9,18 +9,28 @@ Ce module contient la logique Retrieval-Augmented Generation (RAG) :
 
 Il est utilisé par l'application principale et peut aussi servir
 pour les scripts d'évaluation.
+
+Le pipeline est instrumenté avec :
+- logging : suivi technique de l'exécution ;
+- Logfire : traçabilité des étapes clés du RAG
+  (question, retrieval, contexte, prompt, réponse).
 """
 
 import logging
 from typing import Optional
 
+import logfire
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 
 from .config import MISTRAL_API_KEY, MODEL_NAME, NAME, SEARCH_K
 from .vector_store import VectorStoreManager
+from evaluate.core.schemas import RagPipelineOutput
 
 logger = logging.getLogger(__name__)
+
+# Initialisation de Logfire pour tracer les étapes du pipeline RAG
+logfire.configure()
 
 # --- Configuration de l'API Mistral ---
 if not MISTRAL_API_KEY:
@@ -171,44 +181,39 @@ def poser_question(
     vector_store_manager: Optional[VectorStoreManager] = None,
     k: int = SEARCH_K,
 ) -> dict:
-    """Exécute la logique RAG complète pour une question.
+    """Exécute la logique RAG complète pour une question."""
+    logfire.info("Question utilisateur", question=prompt)
 
-    Args:
-        prompt: Question posée par l'utilisateur.
-        vector_store_manager: Instance de VectorStoreManager.
-            Si None, la fonction tente de le charger.
-        k: Nombre de résultats à récupérer depuis le Vector Store.
-
-    Returns:
-        Un dictionnaire contenant :
-        - question
-        - answer
-        - search_results
-        - context_str
-        - final_prompt_for_llm
-        - messages_for_api
-    """
     if vector_store_manager is None:
         vector_store_manager = get_vector_store_manager()
 
+    # Cas erreur : vector store indisponible
     if vector_store_manager is None:
         logger.error("VectorStoreManager non disponible pour la recherche.")
-        return {
-            "question": prompt,
-            "answer": (
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=(
                 "Le service de recherche de connaissances n'est pas disponible. "
                 "Impossible de traiter votre demande."
             ),
-            "search_results": [],
-            "context_str": "",
-            "final_prompt_for_llm": "",
-            "messages_for_api": [],
-        }
+            search_results=[],
+            context_str="",
+            final_prompt_for_llm="",
+            messages_for_api=[],
+        )
+        return result.model_dump()
 
+    # Recherche
     try:
         logger.info("Recherche de contexte pour la question: '%s' avec k=%s", prompt, k)
         search_results = vector_store_manager.search(prompt, k=k)
         logger.info("%s chunks trouvés dans le Vector Store.", len(search_results))
+
+        logfire.info(
+            "Résultats de recherche",
+            n_chunks=len(search_results),
+        )
     except Exception:
         logger.exception(
             "Erreur pendant vector_store_manager.search pour la query: %s",
@@ -216,24 +221,53 @@ def poser_question(
         )
         search_results = []
 
+        logfire.info(
+            "Résultats de recherche",
+            n_chunks=0,
+        )
+
+    # Construction contexte
     context_str = construire_contexte(search_results)
+
+    logfire.info(
+        "Contexte construit",
+        longueur=len(context_str),
+    )
 
     if not search_results:
         logger.warning("Aucun contexte trouvé pour la query: %s", prompt)
 
+    # Prompt
     final_prompt_for_llm = construire_prompt(prompt, context_str)
+
+    logfire.info(
+        "Prompt généré",
+        longueur=len(final_prompt_for_llm),
+    )
 
     messages_for_api = [
         ChatMessage(role="user", content=final_prompt_for_llm)
     ]
 
+    # Génération réponse
     response_content = generer_reponse(messages_for_api)
 
-    return {
-        "question": prompt,
-        "answer": response_content,
-        "search_results": search_results,
-        "context_str": context_str,
-        "final_prompt_for_llm": final_prompt_for_llm,
-        "messages_for_api": messages_for_api,
-    }
+    logfire.info(
+        "Réponse générée",
+        longueur=len(response_content),
+    )
+
+    # Validation Pydantic
+    result = RagPipelineOutput(
+        question=prompt,
+        answer=response_content,
+        search_results=search_results,
+        context_str=context_str,
+        final_prompt_for_llm=final_prompt_for_llm,
+        messages_for_api=[
+            {"role": msg.role, "content": msg.content}
+            for msg in messages_for_api
+        ],
+    )
+
+    return result.model_dump()

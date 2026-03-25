@@ -12,10 +12,16 @@ chaque question, ainsi qu'un résumé des métriques globales et par catégorie.
 Il gère également les cas où il n'y a pas de questions répondables ou non
 répondables, en assurant que les résultats sont cohérents et complets même
 dans ces scénarios.
+
+Le script est instrumenté avec :
+- logging : suivi technique de l'exécution ;
+- Logfire : traçabilité des grandes étapes du protocole d'évaluation.
 """
 
 import logging
 from pathlib import Path
+
+import logfire
 
 from utils.config import (
     RAG_EVAL_DATASET_FILE,
@@ -53,10 +59,10 @@ def setup_ragas_logging() -> None:
 
     root_logger = logging.getLogger()
 
-    # Vérite qu'on n'ajoute pas plusieurs fois le même FileHandler
+    # Vérifie qu'on n'ajoute pas plusieurs fois le même FileHandler
     file_handler_exists = any(
         isinstance(handler, logging.FileHandler)
-        and Path(getattr(handler, "baseFilename", "")) == Path(RAGAS_LOG_FILE).resolve()
+        and Path(getattr(handler, "baseFilename", "")).resolve() == Path(RAGAS_LOG_FILE).resolve()
         for handler in root_logger.handlers
     )
 
@@ -81,11 +87,17 @@ def main() -> None:
     - affichage d'un résumé des scores dans la console.
     """
     setup_ragas_logging()
+    logfire.configure()
 
     logger.info("=== Début du script evaluate_ragas ===")
 
     samples = load_eval_dataset(RAG_EVAL_DATASET_FILE)
+    logger.info("Dataset chargé avec %s questions.", len(samples))
+    logfire.info("Dataset chargé", n_questions=len(samples))
+
     rows = build_ragas_rows(samples=samples, search_k=RAGAS_SEARCH_K)
+    logger.info("%s lignes d'évaluation construites.", len(rows))
+    logfire.info("Construction des lignes RAGAS", n_rows=len(rows), search_k=RAGAS_SEARCH_K)
 
     results_df, summary = run_ragas(
         rows=rows,
@@ -99,11 +111,25 @@ def main() -> None:
         ],
     )
 
+    logfire.info(
+        "Évaluation RAGAS terminée",
+        n_questions=summary["n_questions_total"],
+        answerable_true=summary["n_answerable_true"],
+        answerable_false=summary["n_answerable_false"],
+    )
+
     save_outputs(
         results_df=results_df,
         summary=summary,
         results_csv_file=RAGAS_RESULTS_CSV_FILE,
         summary_json_file=RAGAS_SUMMARY_JSON_FILE,
+    )
+
+    logger.info("Résultats sauvegardés.")
+    logfire.info(
+        "Résultats sauvegardés",
+        results_csv=RAGAS_RESULTS_CSV_FILE,
+        summary_json=RAGAS_SUMMARY_JSON_FILE,
     )
 
     print("\n===== RAGAS =====")

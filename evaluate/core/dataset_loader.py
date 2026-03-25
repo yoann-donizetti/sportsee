@@ -7,22 +7,11 @@ et retourne une liste d'instances EvalSample prêtes à être utilisées pour l'
 import json
 import logging
 from pydantic import BaseModel, Field, ValidationError
+import json
+import logging
+from pydantic import ValidationError
 
-
-class EvalSample(BaseModel):
-    """Représente une question d'évaluation RAGAS.
-    Attributs :
-    - id : Identifiant unique de la question (entier positif).
-    - question : Texte de la question.
-    - ground_truth : Réponse correcte à la question.
-    - category : Catégorie de la question.
-    - answerable : Indique si la question est répondable."""
-
-    id: int = Field(..., ge=1)
-    question: str = Field(..., min_length=3)
-    ground_truth: str = Field(..., min_length=3)
-    category: str = Field(..., min_length=2)
-    answerable: bool
+from evaluate.core.schemas import EvalSample
 
 
 def load_eval_dataset(dataset_path: str) -> list[EvalSample]:
