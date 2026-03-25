@@ -1,9 +1,17 @@
 """
-ce module contient la fonction principale pour exécuter l'évaluation RAGAS en utilisant les lignes d'évaluation construites par le module RAGAS Builder.
-Il utilise les fonctions d'évaluation de RAGAS pour calculer les métriques de performance du modèle sur les questions répondables, et vérifie les refus de répondre sur les questions non répondables.
-Il retourne un DataFrame détaillé avec les résultats de l'évaluation pour chaque question, ainsi qu'un résumé des métriques globales et par catégorie.
-Il gère également les cas où il n'y a pas de questions répondables ou non répondables, en assurant que les résultats sont cohérents et complets même dans ces scénarios.
+Ce module contient la fonction principale pour exécuter l'évaluation RAGAS
+en utilisant les lignes d'évaluation construites par le module RAGAS Builder.
 
+Il utilise les fonctions d'évaluation de RAGAS pour calculer les métriques
+de performance du modèle sur les questions répondables, et vérifie les refus
+de répondre sur les questions non répondables.
+
+Il retourne un DataFrame détaillé avec les résultats de l'évaluation pour
+chaque question, ainsi qu'un résumé des métriques globales et par catégorie.
+
+Il gère également les cas où il n'y a pas de questions répondables ou non
+répondables, en assurant que les résultats sont cohérents et complets même
+dans ces scénarios.
 """
 
 import logging
@@ -18,38 +26,63 @@ from utils.config import (
     MISTRAL_API_KEY,
     MODEL_NAME,
 )
+from utils.logging_config import setup_logging
 
 from evaluate.core.dataset_loader import load_eval_dataset
 from evaluate.core.ragas_builder import build_ragas_rows
 from evaluate.core.ragas_runner import run_ragas
 from evaluate.core.saver import save_outputs
 
+logger = logging.getLogger(__name__)
 
-# ==============================
-# Logging
-# ==============================
-Path(RAGAS_LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(module)s - %(message)s",
-    handlers=[
-        logging.FileHandler(RAGAS_LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(),
-    ],
-)
+def setup_ragas_logging() -> None:
+    """
+    Configure le logging pour le script d'évaluation RAGAS.
+
+    Cette configuration :
+    - applique le logging global du projet ;
+    - ajoute un fichier de log dédié à l'évaluation RAGAS.
+
+    Le fichier de log permet de conserver une trace exploitable
+    de l'exécution du protocole d'évaluation.
+    """
+    setup_logging()
+
+    Path(RAGAS_LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
+
+    root_logger = logging.getLogger()
+
+    # Vérite qu'on n'ajoute pas plusieurs fois le même FileHandler
+    file_handler_exists = any(
+        isinstance(handler, logging.FileHandler)
+        and Path(getattr(handler, "baseFilename", "")) == Path(RAGAS_LOG_FILE).resolve()
+        for handler in root_logger.handlers
+    )
+
+    if not file_handler_exists:
+        file_handler = logging.FileHandler(RAGAS_LOG_FILE, encoding="utf-8")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+        )
+        root_logger.addHandler(file_handler)
 
 
 def main() -> None:
     """
-    Fonction principale pour exécuter l'évaluation RAGAS.
-    Elle charge le dataset d'évaluation, construit les lignes d'évaluation en interrogeant
-    le pipeline RAG, exécute l'évaluation RAGAS pour calculer les métriques de performance,
-    et sauvegarde les résultats dans un fichier CSV et un résumé dans un fichier JSON.
-     Elle affiche également un résumé des résultats dans la console.
-     La fonction gère les cas où il n'y a pas de questions répondables ou non répondables, 
-     en assurant que les résultats sont cohérents et complets même dans ces scénarios."""
-    logging.info("=== Début du script evaluate_ragas ===")
+    Exécute l'évaluation complète du pipeline RAG avec RAGAS.
+
+    Étapes réalisées :
+    - chargement du dataset d'évaluation ;
+    - génération des réponses du pipeline RAG ;
+    - calcul des métriques RAGAS ;
+    - sauvegarde des résultats détaillés et du résumé ;
+    - affichage d'un résumé des scores dans la console.
+    """
+    setup_ragas_logging()
+
+    logger.info("=== Début du script evaluate_ragas ===")
 
     samples = load_eval_dataset(RAG_EVAL_DATASET_FILE)
     rows = build_ragas_rows(samples=samples, search_k=RAGAS_SEARCH_K)
@@ -85,7 +118,7 @@ def main() -> None:
     print("\n--- Robustesse questions answerable = false ---")
     print(f"refusal_rate: {summary['answerable_false']['refusal_rate']:.4f}")
 
-    logging.info("=== Fin du script evaluate_ragas ===")
+    logger.info("=== Fin du script evaluate_ragas ===")
 
 
 if __name__ == "__main__":

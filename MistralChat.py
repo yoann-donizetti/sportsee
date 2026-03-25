@@ -3,7 +3,9 @@ import logging
 
 from utils.config import APP_TITLE, NAME
 from utils.rag_pipeline import poser_question, get_vector_store_manager
+from utils.logging_config import setup_logging
 
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +38,7 @@ for message in st.session_state.messages:
 
 # Input utilisateur
 if prompt := st.chat_input(f"Posez votre question sur la {NAME}..."):
+    logger.info("Nouvelle question posée (longueur=%s caractères)", len(prompt))
 
     # message user
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -45,6 +48,7 @@ if prompt := st.chat_input(f"Posez votre question sur la {NAME}..."):
     # Vérif vector store
     if vector_store_manager is None:
         st.error("Le système RAG n'est pas disponible.")
+        logger.error("VectorStoreManager non disponible. Impossible de traiter la question.")
         st.stop()
 
     # Appel pipeline RAG (IMPORTANT)
@@ -60,7 +64,7 @@ if prompt := st.chat_input(f"Posez votre question sur la {NAME}..."):
         response = result["answer"]
 
         placeholder.write(response)
-
+        logger.info("Réponse générée (longueur=%s caractères)", len(response))
     # Ajout historique
     st.session_state.messages.append({
         "role": "assistant",
