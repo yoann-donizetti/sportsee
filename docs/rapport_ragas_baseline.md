@@ -22,6 +22,35 @@ L’évaluation a été réalisée sur 15 questions :
 
 ---
 
+## Architecture technique mise en place
+
+Le système évalué repose sur un pipeline RAG structuré, avec plusieurs composants assurant la fiabilité et la traçabilité :
+
+- **Pipeline RAG** :
+  - récupération des documents via un Vector Store (FAISS) ;
+  - construction d’un contexte pertinent ;
+  - génération de réponse via le modèle Mistral.
+
+- **Validation des données (Pydantic)** :
+  - validation du dataset d’évaluation ;
+  - validation des sorties du pipeline RAG (format structuré, cohérence des champs).
+
+- **Logging structuré** :
+  - suivi des étapes clés (retrieval, génération, erreurs) ;
+  - traçabilité des appels au modèle et des résultats.
+
+- **Instrumentation avec Logfire** :
+  - observabilité du pipeline en temps réel ;
+  - suivi des erreurs et du comportement global du système.
+
+- **Évaluation avec RAGAS** :
+  - mesure de la qualité des réponses (fidélité, pertinence, qualité du contexte) ;
+  - analyse différenciée selon le type de question.
+
+Cette architecture constitue une **baseline instrumentée**, permettant d’analyser précisément les performances et d’identifier les axes d’amélioration.
+
+---
+
 ## Métriques RAGAS
 **Question clé** : *la réponse est-elle correcte ET basée sur les données ?*
 
@@ -54,6 +83,7 @@ L’évaluation a été réalisée sur 15 questions :
 - **Importance**: critique en production pour éviter les hallucinations.
 
 ## Résultats
+
 ### Tableau de synthèse
 
 | Indicateur         | Score | Lecture                                 |
@@ -64,6 +94,8 @@ L’évaluation a été réalisée sur 15 questions :
 | Context Recall     | 0.49  | Couverture partielle                      |
 | Refusal Rate       | 0.00  | Aucun refus → hallucinations              |
 
+Le score de **refusal rate à 0.00** indique que le système n’a correctement refusé aucune des questions non répondables.  
+Les 3 questions hors périmètre ont toutes donné lieu à une réponse, ce qui confirme un problème critique d’hallucination.
 
 ### Par type de question (moyennes)
 
@@ -219,7 +251,7 @@ Le système est performant pour des usages simples, mais devient risqué dès qu
 - ou que la réponse n’est pas directement visible
 
 
-Cette première évaluation ne constitue pas une fin en soi, mais un point de départ.  
+Cette première évaluation constitue une baseline de référence pour mesurer les améliorations futures du système. 
 Elle permet d’identifier précisément les axes d’amélioration à mettre en œuvre pour rendre le système plus fiable, plus robuste et mieux adapté aux besoins métier.
 
 
@@ -329,23 +361,23 @@ La première évaluation montre que toutes les questions ne doivent pas être tr
 
 ---
 
-### Renforcer la validation et la traçabilité
+### Validation et traçabilité du pipeline
 
-Le projet demande explicitement une sécurisation des flux de données et un suivi du comportement du pipeline.
+Afin de sécuriser le pipeline et d’améliorer la capacité d’analyse des erreurs, plusieurs mécanismes ont été mis en place :
 
-**Amélioration proposée :**
-- renforcer l’utilisation de Pydantic pour valider :
-  - les données d’entrée ;
-  - les sorties du retrieval ;
-  - les résultats SQL ;
-  - les réponses générées ;
-- intégrer un logging structuré sur les étapes clés ;
-- exploiter Logfire pour observer le comportement du pipeline.
+- utilisation de **Pydantic** pour valider :
+  - les données d’entrée du dataset ;
+  - les sorties du pipeline RAG ;
+- mise en place d’un **logging structuré** pour suivre :
+  - les étapes de retrieval ;
+  - la génération de réponse ;
+  - les erreurs éventuelles ;
+- intégration de **Logfire** pour :
+  - observer le comportement du pipeline ;
+  - analyser les appels au modèle ;
+  - faciliter le debugging.
 
-**Effet attendu :**
-- meilleur diagnostic des erreurs ;
-- pipeline plus robuste ;
-- meilleure reproductibilité de l’évaluation.
+Ces éléments permettent d’obtenir un système **plus robuste et traçable**, facilitant les phases d’analyse et d’amélioration.
 
 ---
 

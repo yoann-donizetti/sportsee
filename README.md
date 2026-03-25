@@ -1,134 +1,168 @@
-# Assistant RAG avec Mistral
+# NBA Analyst AI — Assistant RAG avec Mistral
 
-Ce projet implémente un assistant virtuel basé sur le modèle Mistral, utilisant la technique de Retrieval-Augmented Generation (RAG) pour fournir des réponses précises et contextuelles à partir d'une base de connaissances personnalisée.
+Ce projet implémente un assistant IA basé sur la technique de **Retrieval-Augmented Generation (RAG)** pour répondre à des questions sur des données NBA.
+
+L’objectif est de construire un système capable de :
+- répondre à des questions factuelles et analytiques ;
+- s’appuyer sur des données structurées ;
+- être évalué de manière rigoureuse (RAGAS).
+
+---
 
 ## Fonctionnalités
 
-- 🔍 **Recherche sémantique** avec FAISS pour trouver les documents pertinents
-- 🤖 **Génération de réponses** avec les modèles Mistral (Small ou Large)
-- ⚙️ **Paramètres personnalisables** (modèle, nombre de documents, score minimum)
+-  **Recherche sémantique** avec FAISS
+-  **Génération de réponses** avec Mistral
+-  **Évaluation automatique avec RAGAS**
+-  **Dataset de test structuré** (questions simples, complexes, bruitées)
+-  **Validation des données avec Pydantic**
+-  **Observabilité avec Logfire + logging structuré**
 
-## Prérequis
+---
 
-- Python 3.9+ 
-- Clé API Mistral (obtenue sur [console.mistral.ai](https://console.mistral.ai/))
+##  Architecture
+
+Le système repose sur un pipeline RAG complet :
+
+1. **Retrieval**
+   - indexation des données (FAISS)
+   - recherche des documents pertinents
+
+2. **Context building**
+   - sélection et formatage des chunks
+
+3. **Generation**
+   - appel au modèle Mistral
+   - production de la réponse
+
+4. **Validation**
+   - structuration des sorties avec Pydantic
+
+5. **Évaluation**
+   - scoring avec RAGAS :
+     - faithfulness
+     - answer relevancy
+     - context precision
+     - context recall
+
+---
+
+##  Résultats (Baseline)
+
+| Metric              | Score |
+|--------------------|------|
+| Faithfulness       | 0.53 |
+| Answer Relevancy   | 0.79 |
+| Context Precision  | 0.30 |
+| Context Recall     | 0.49 |
+| Refusal Rate       | 0.00 |
+
+Le score de refusal rate à 0.00 indique que le système ne sait pas refuser
+les questions hors périmètre et génère systématiquement une réponse,
+même lorsque l'information n'est pas disponible.
+
+###  Interprétation
+
+- Bonne compréhension globale des questions
+- Problèmes de fiabilité (hallucinations)
+- Retrieval encore bruité
+- Aucune gestion du refus (point critique)
+
+---
+
+##  Structure du projet
+```bash
+
+nba-analyst-ai/
+├── docs/                         # Documentation, rapports d'analyse
+│   └── rapport_ragas_baseline.md
+│
+├── evaluate/                     # Évaluation automatique du système
+│   ├── core/
+│   │   ├── cleaning.py
+│   │   ├── dataset_loader.py
+│   │   ├── ragas_builder.py
+│   │   ├── ragas_runner.py
+│   │   ├── safe_mistral.py
+│   │   ├── saver.py
+│   │   └── schemas.py
+│   │
+│   ├── datasets/
+│   │   └── rag_eval_dataset.json
+│   │
+│   ├── results/
+│   │   ├── ragas_results.csv
+│   │   └── ragas_summary.json
+│   │
+│   └── scripts/
+│       └── evaluate_ragas.py
+│
+├── rag_pipeline/                 # Pipeline RAG principal
+│   ├── config.py
+│   ├── rag_pipeline.py
+│   └── vector_store.py
+│
+├── utils/                        # Fonctions utilitaires
+│   ├── data_loader.py
+│   └── logging_config.py
+│
+├── inputs/                       # Données sources à indexer
+│
+├── vector_db/                    # Index FAISS (non versionné, généré automatiquement)
+│   └── faiss_index.idx
+│
+├── indexer.py                    # Script d'indexation
+├── MistralChat.py                # Interface utilisateur (Streamlit)
+├── requirements.txt
+├── README.md
+└── .gitignore
+```
+---
 
 ## Installation
 
-1. **Cloner le dépôt**
-
 ```bash
-git clone <url-du-repo>
-cd <nom-du-repo>
-```
+git clone <repo>
+cd <repo>
 
-2. **Créer un environnement virtuel**
-
-```bash
-# Création de l'environnement virtuel
 python -m venv venv
+source venv/bin/activate  # ou venv\Scripts\activate sous Windows
 
-# Activation de l'environnement virtuel
-# Sur Windows
-venv\Scripts\activate
-# Sur macOS/Linux
-source venv/bin/activate
-```
-
-3. **Installer les dépendances**
-
-```bash
 pip install -r requirements.txt
 ```
+## Configuration
 
-4. **Configurer la clé API**
+Créer un fichier .env :
 
-Créez un fichier `.env` à la racine du projet avec le contenu suivant :
+MISTRAL_API_KEY=your_api_key
 
-```
-MISTRAL_API_KEY=votre_clé_api_mistral
-```
-
-## Structure du projet
-
-```
-.
-├── MistralChat.py          # Application Streamlit principale
-├── indexer.py              # Script pour indexer les documents
-├── inputs/                 # Dossier pour les documents sources
-├── vector_db/              # Dossier généré automatiquement (non versionné)
-├── database/               # Base de données SQLite pour les interactions
-└── utils/                  # Modules utilitaires
-    ├── config.py           # Configuration de l'application
-    ├── data_loader.py      # Chargement et parsing des documents
-    └── vector_store.py     # Gestion de l'index vectoriel
-
-```
-
-## Utilisation
-
-### 1. Ajouter des documents
-
-Placez vos documents dans le dossier `inputs/`. Les formats supportés sont :
-- PDF
-- TXT
-- DOCX
-- CSV
-Vous pouvez organiser vos documents dans des sous-dossiers pour une meilleure organisation.
-
-### 2. Indexer les documents
-
-Exécutez le script d'indexation pour traiter les documents et créer l'index FAISS :
+## Lancer l’évaluation
 
 ```bash
-python indexer.py
+python evaluate/scripts/evaluate_ragas.py
 ```
 
-Ce script va :
-1. Charger les documents depuis le dossier `inputs/`
-2. Découper les documents en chunks
-3. Générer des embeddings avec Mistral
-4. Créer un index FAISS pour la recherche sémantique
-5. Sauvegarder l'index et les chunks dans le dossier `vector_db/`
+## Dataset d’évaluation
+Le système est testé sur :
+- questions factuelles simples
+- questions complexes
+- comparaisons
+- questions bruitées
+- questions non répondables
 
-### 3. Lancer l'application
+## Limites actuelles
 
-```bash
-streamlit run MistralChat.py
-```
-
-L'application sera accessible à l'adresse http://localhost:8501 dans votre navigateur.
+- hallucinations sur certaines questions
+- mauvaise gestion des données absentes
+- retrieval perfectible (bruit + manque de précision)
 
 
-## Modules principaux
+## Améliorations prévues
 
-### `utils/vector_store.py`
+- intégration d’un Tool SQL pour les questions chiffrées
+- meilleure gestion du refus
+- amélioration du retrieval (chunking, reranking)
+- seconde évaluation comparative
 
-Gère l'index vectoriel FAISS et la recherche sémantique :
-- Chargement et découpage des documents
-- Génération des embeddings avec Mistral
-- Création et interrogation de l'index FAISS
-
-### `utils/query_classifier.py`
-
-Détermine si une requête nécessite une recherche RAG :
-- Analyse des mots-clés
-- Classification avec le modèle Mistral
-- Détection des questions spécifiques vs générales
-
-### `utils/data_loader.py`
-
-Gère le chargement et le parsing des données :
-- Extraction de texte à partir de différents formats (PDF, TXT, DOCX, CSV, Excel)
-- Gestion d’un fallback OCR pour les PDF scannés (EasyOCR)
-- Organisation des documents avec métadonnées (source, catégorie, chemin)
-- Préparation des données pour le pipeline RAG
-
-## Personnalisation
-
-Vous pouvez personnaliser l'application en modifiant les paramètres dans `utils/config.py` :
-- Modèles Mistral utilisés
-- Taille des chunks et chevauchement
-- Nombre de documents par défaut
-- Nom de la commune ou organisation
-
+## Objectif
+Faire évoluer le système d’un assistant **convaincant** vers un assistant **fiable et robuste**, capable de répondre correctement à des questions métier complexe.
