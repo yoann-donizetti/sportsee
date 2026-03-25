@@ -12,7 +12,7 @@ Pour chaque question, elle récupère la réponse générée par le modèle ains
 import logging
 from typing import Any
 
-from utils.rag_pipeline import get_vector_store_manager, poser_question
+from rag_pipeline.rag_pipeline import get_vector_store_manager, poser_question
 
 
 def build_ragas_rows(samples: list[Any], search_k: int) -> list[dict[str, Any]]:

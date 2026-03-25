@@ -9,7 +9,7 @@ import numpy as np
 import requests
 from tqdm import tqdm
 
-from utils.config import (
+from rag_pipeline.config import (
     OCR_LANGUAGES,
     PDF_OCR_MIN_TEXT_LENGTH,
     PDF_OCR_ZOOM_X,

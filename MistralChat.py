@@ -1,8 +1,8 @@
 import streamlit as st
 import logging
 
-from utils.config import APP_TITLE, NAME
-from utils.rag_pipeline import poser_question, get_vector_store_manager
+from rag_pipeline.config import APP_TITLE, NAME
+from rag_pipeline.rag_pipeline import poser_question, get_vector_store_manager
 from utils.logging_config import setup_logging
 
 setup_logging()

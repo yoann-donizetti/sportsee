@@ -23,7 +23,7 @@ from pathlib import Path
 
 import logfire
 
-from utils.config import (
+from rag_pipeline.config import (
     RAG_EVAL_DATASET_FILE,
     RAGAS_RESULTS_CSV_FILE,
     RAGAS_SUMMARY_JSON_FILE,
