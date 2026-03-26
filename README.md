@@ -22,7 +22,7 @@ L’objectif est de construire un système capable de :
 
 ##  Architecture
 
-Le système repose sur un pipeline RAG complet :
+Le système s’appuie sur un pipeline RAG structuré en plusieurs étapes :
 
 1. **Retrieval**
    - indexation des données (FAISS)
@@ -119,6 +119,86 @@ nba-analyst-ai/
 ```
 ---
 
+## Modules principaux
+
+### rag_pipeline/vector_store.py
+
+Gère la base vectorielle FAISS et la recherche sémantique :
+
+- chargement et découpage des documents en chunks ;
+- génération des embeddings avec Mistral ;
+- création et sauvegarde de l’index FAISS ;
+- recherche des documents les plus pertinents (similarité cosinus).
+
+---
+
+### rag_pipeline/rag_pipeline.py
+
+Implémente le pipeline RAG complet :
+
+- récupération des documents pertinents (retrieval) ;
+- construction du contexte ;
+- génération du prompt ;
+- appel au modèle Mistral ;
+- structuration de la réponse avec Pydantic.
+
+---
+
+### utils/data_loader.py
+
+Gère le chargement et le parsing des données :
+
+- extraction de texte depuis différents formats (PDF, TXT, DOCX, CSV, Excel) ;
+- fallback OCR pour les PDF scannés ;
+- enrichissement des métadonnées.
+
+---
+
+### evaluate/core/
+
+Contient la logique d’évaluation :
+
+- construction du dataset RAGAS ;
+- exécution des métriques (faithfulness, relevancy, etc.) ;
+- sauvegarde des résultats ;
+- validation des données avec Pydantic.
+
+---
+
+## Paramétrage
+
+L’application est configurable via le fichier `rag_pipeline/config.py`.
+
+Les principaux paramètres modifiables sont :
+
+- **Modèles Mistral**
+  - modèle de génération (`MODEL_NAME`)
+  - modèle d’embedding (`EMBEDDING_MODEL`)
+
+- **Indexation**
+  - taille des chunks (`CHUNK_SIZE`)
+  - chevauchement des chunks (`CHUNK_OVERLAP`)
+  - taille des batchs pour les embeddings (`EMBEDDING_BATCH_SIZE`)
+
+- **Recherche**
+  - nombre de documents retournés (`SEARCH_K`)
+  - seuil minimum de similarité (optionnel)
+
+- **Chemins**
+  - dossier des données (`INPUT_DIR`)
+  - index vectoriel (`VECTOR_DB_DIR`)
+  - fichiers FAISS et chunks
+
+- **Évaluation**
+  - dataset RAGAS utilisé
+  - fichiers de sortie (CSV, JSON)
+
+- **Application**
+  - nom de l’assistant (`NAME`)
+  - titre de l’application (`APP_TITLE`)
+
+---
+
 ## Installation
 
 ```bash
@@ -136,11 +216,54 @@ Créer un fichier .env :
 
 MISTRAL_API_KEY=your_api_key
 
-## Lancer l’évaluation
+## Exécution du projet
+### 1. Ajouter des documents
+
+Placez vos documents dans le dossier `inputs/`. Les formats supportés sont :
+- PDF
+- TXT
+- DOCX
+- CSV
+- Excel (.xlsx, xls)
+
+Les documents peuvent être organisés dans des sous-dossiers pour faciliter le classement des sources.
+
+
+### 2. Indexer les documents
+
+Exécutez le script d’indexation pour parser les fichiers, créer les chunks, générer les embeddings et construire l’index FAISS :
 
 ```bash
-python evaluate/scripts/evaluate_ragas.py
+python -m indexer
 ```
+
+Ce script va :
+1. Charger les documents depuis le dossier `inputs/`
+2. Découper les documents en chunks
+3. Générer des embeddings avec Mistral
+4. Créer un index FAISS pour la recherche sémantique
+5. Sauvegarder l'index et les chunks dans le dossier `vector_db/`
+
+### 3. Lancer l'application
+
+```bash
+streamlit run MistralChat.py
+```
+
+L'application sera accessible à l'adresse http://localhost:8501 dans votre navigateur.
+
+
+### 4. Lancer l'évaluation RAGAS 
+
+```bash
+python -m evaluate.scripts.evaluate_ragas
+```
+
+Les résultats sont générés dans :
+
+- [Résultats détaillés RAGAS (CSV)](evaluate/results/ragas_results.csv)
+- [Résumé des scores RAGAS (JSON)](evaluate/results/ragas_summary.json)
+- [Rapport d’évaluation RAGAS (baseline)](docs/rapport_ragas_baseline.md)
 
 ## Dataset d’évaluation
 Le système est testé sur :
@@ -165,4 +288,4 @@ Le système est testé sur :
 - seconde évaluation comparative
 
 ## Objectif
-Faire évoluer le système d’un assistant **convaincant** vers un assistant **fiable et robuste**, capable de répondre correctement à des questions métier complexe.
+Faire évoluer le système d’un assistant **convaincant** vers un assistant **fiable et robuste**, capable de répondre correctement à des questions métier complexes.

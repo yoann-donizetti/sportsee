@@ -1,5 +1,7 @@
 # Rapport d’analyse RAGAS — Évaluation Baseline du Système IA SportSee
 
+Cette évaluation constitue la baseline du système avant intégration des données structurées (SQL Tool).
+
 **Accès aux ressources**
 
 Ces fichiers permettent de reproduire l’évaluation et d’analyser les résultats détaillés du système RAG.
@@ -409,3 +411,6 @@ Les priorités sont les suivantes :
 3. renforcer la gestion du refus ;
 4. améliorer le retrieval textuel ;
 5. réévaluer le système avec le même protocole pour mesurer les progrès.
+
+
+Cette baseline met en évidence un système convaincant mais encore insuffisamment fiable pour un usage métier critique, justifiant l’intégration d’un Tool SQL et l’amélioration du pipeline RAG.
