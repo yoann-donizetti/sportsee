@@ -1,6 +1,22 @@
+"""Gestion du vector store FAISS pour le pipeline RAG.
+
+Ce module permet de :
+- charger des documents déjà parsés ;
+- les découper en chunks ;
+- générer des embeddings avec Mistral ;
+- construire un index FAISS ;
+- sauvegarder / recharger l'index et les chunks ;
+- effectuer une recherche sémantique.
+
+Points importants :
+- les chemins sont gérés avec pathlib pour fiabiliser la sauvegarde ;
+- l'index utilise une similarité cosinus (via normalisation L2 + IndexFlatIP) ;
+- les logs permettent de suivre les étapes principales de l'indexation.
+"""
+
 import logging
-import os
 import pickle
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import faiss
@@ -25,23 +41,38 @@ logger = logging.getLogger(__name__)
 
 
 class VectorStoreManager:
-    """Gère la création, le chargement et la recherche dans un index Faiss."""
+    """Gère la création, le chargement et la recherche dans un index FAISS."""
 
     def __init__(self) -> None:
+        """
+        Initialise le gestionnaire du vector store.
+
+        Attributs :
+        - self.index : index FAISS chargé ou créé ;
+        - self.document_chunks : liste des chunks indexés ;
+        - self.index_file : chemin absolu du fichier d'index FAISS ;
+        - self.chunks_file : chemin absolu du fichier de chunks sérialisés ;
+        - self.mistral_client : client API Mistral.
+        """
         self.index: Optional[faiss.Index] = None
         self.document_chunks: List[Dict[str, Any]] = []
+
+        # Conversion en chemins absolus robustes
+        self.index_file = Path(FAISS_INDEX_FILE).resolve()
+        self.chunks_file = Path(DOCUMENT_CHUNKS_FILE).resolve()
+
         self.mistral_client = MistralClient(api_key=MISTRAL_API_KEY)
         self._load_index_and_chunks()
 
     def _load_index_and_chunks(self) -> None:
-        """Charge l'index Faiss et les chunks si les fichiers existent."""
-        if os.path.exists(FAISS_INDEX_FILE) and os.path.exists(DOCUMENT_CHUNKS_FILE):
+        """Charge l'index FAISS et les chunks si les fichiers existent déjà."""
+        if self.index_file.exists() and self.chunks_file.exists():
             try:
-                logger.info("Chargement de l'index Faiss depuis %s...", FAISS_INDEX_FILE)
-                self.index = faiss.read_index(FAISS_INDEX_FILE)
+                logger.info("Chargement de l'index Faiss depuis %s...", self.index_file)
+                self.index = faiss.read_index(str(self.index_file))
 
-                logger.info("Chargement des chunks depuis %s...", DOCUMENT_CHUNKS_FILE)
-                with open(DOCUMENT_CHUNKS_FILE, "rb") as f:
+                logger.info("Chargement des chunks depuis %s...", self.chunks_file)
+                with open(self.chunks_file, "rb") as f:
                     self.document_chunks = pickle.load(f)
 
                 logger.info(
@@ -49,6 +80,7 @@ class VectorStoreManager:
                     self.index.ntotal,
                     len(self.document_chunks),
                 )
+
             except Exception as e:
                 logger.error("Erreur lors du chargement de l'index/chunks: %s", e)
                 self.index = None
@@ -61,7 +93,7 @@ class VectorStoreManager:
     def _split_documents_to_chunks(
         self, documents: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Découpe les documents en chunks avec métadonnées."""
+        """Découpe les documents en chunks avec leurs métadonnées."""
         logger.info(
             "Découpage de %s documents en chunks (taille=%s, chevauchement=%s)...",
             len(documents),
@@ -80,6 +112,7 @@ class VectorStoreManager:
         doc_counter = 0
 
         for doc in documents:
+            # Conversion de notre structure vers le format LangChain
             langchain_doc = Document(
                 page_content=doc["page_content"],
                 metadata=doc["metadata"],
@@ -172,6 +205,8 @@ class VectorStoreManager:
                     e,
                 )
 
+                # Si un lot échoue, on ajoute des vecteurs nuls pour ne pas casser
+                # complètement le pipeline, à condition de connaître la dimension.
                 num_failed = len(texts_to_embed)
                 if all_embeddings:
                     dim = len(all_embeddings[0])
@@ -200,11 +235,12 @@ class VectorStoreManager:
         return embeddings_array
 
     def build_index(self, documents: List[Dict[str, Any]]) -> None:
-        """Construit l'index Faiss à partir des documents."""
+        """Construit l'index FAISS à partir des documents fournis."""
         if not documents:
             logger.warning("Aucun document fourni pour construire l'index.")
             return
 
+        # 1. Découpage en chunks
         self.document_chunks = self._split_documents_to_chunks(documents)
         if not self.document_chunks:
             logger.error(
@@ -212,6 +248,7 @@ class VectorStoreManager:
             )
             return
 
+        # 2. Génération des embeddings
         embeddings = self._generate_embeddings(self.document_chunks)
         if embeddings is None or embeddings.shape[0] != len(self.document_chunks):
             logger.error(
@@ -222,12 +259,15 @@ class VectorStoreManager:
             self.document_chunks = []
             self.index = None
 
-            if os.path.exists(FAISS_INDEX_FILE):
-                os.remove(FAISS_INDEX_FILE)
-            if os.path.exists(DOCUMENT_CHUNKS_FILE):
-                os.remove(DOCUMENT_CHUNKS_FILE)
+            # Nettoyage éventuel de fichiers existants
+            if self.index_file.exists():
+                self.index_file.unlink()
+            if self.chunks_file.exists():
+                self.chunks_file.unlink()
+
             return
 
+        # 3. Création de l'index FAISS
         dimension = embeddings.shape[1]
         logger.info(
             "Création de l'index Faiss optimisé pour la similarité cosinus avec "
@@ -235,6 +275,7 @@ class VectorStoreManager:
             dimension,
         )
 
+        # Normalisation L2 pour simuler la similarité cosinus avec IndexFlatIP
         faiss.normalize_L2(embeddings)
 
         self.index = faiss.IndexFlatIP(dimension)
@@ -242,23 +283,25 @@ class VectorStoreManager:
 
         logger.info("Index Faiss créé avec %s vecteurs.", self.index.ntotal)
 
+        # 4. Sauvegarde
         self._save_index_and_chunks()
 
     def _save_index_and_chunks(self) -> None:
-        """Sauvegarde l'index Faiss et la liste des chunks."""
+        """Sauvegarde l'index FAISS et les chunks sérialisés."""
         if self.index is None or not self.document_chunks:
             logger.warning("Tentative de sauvegarde d'un index ou de chunks vides.")
             return
 
-        os.makedirs(os.path.dirname(FAISS_INDEX_FILE), exist_ok=True)
-        os.makedirs(os.path.dirname(DOCUMENT_CHUNKS_FILE), exist_ok=True)
+        # Création sûre des dossiers parents
+        self.index_file.parent.mkdir(parents=True, exist_ok=True)
+        self.chunks_file.parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            logger.info("Sauvegarde de l'index Faiss dans %s...", FAISS_INDEX_FILE)
-            faiss.write_index(self.index, FAISS_INDEX_FILE)
+            logger.info("Sauvegarde de l'index Faiss dans %s...", self.index_file)
+            faiss.write_index(self.index, str(self.index_file))
 
-            logger.info("Sauvegarde des chunks dans %s...", DOCUMENT_CHUNKS_FILE)
-            with open(DOCUMENT_CHUNKS_FILE, "wb") as f:
+            logger.info("Sauvegarde des chunks dans %s...", self.chunks_file)
+            with open(self.chunks_file, "wb") as f:
                 pickle.dump(self.document_chunks, f)
 
             logger.info("Index et chunks sauvegardés avec succès.")
@@ -299,14 +342,17 @@ class VectorStoreManager:
         logger.info("Recherche des %s chunks les plus pertinents pour: '%s'", k, query_text)
 
         try:
+            # 1. Embedding de la requête
             response = self.mistral_client.embeddings(
                 model=EMBEDDING_MODEL,
                 input=[query_text],
             )
             query_embedding = np.array([response.data[0].embedding]).astype("float32")
 
+            # Normalisation pour cohérence avec l'index
             faiss.normalize_L2(query_embedding)
 
+            # 2. Recherche
             search_k = k * 3 if min_score is not None else k
             scores, indices = self.index.search(query_embedding, search_k)
 
@@ -344,6 +390,7 @@ class VectorStoreManager:
                             len(self.document_chunks),
                         )
 
+            # 3. Tri et limitation
             results.sort(key=lambda x: x["score"], reverse=True)
 
             if len(results) > k:

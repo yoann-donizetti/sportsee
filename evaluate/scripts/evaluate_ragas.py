@@ -87,7 +87,7 @@ def main() -> None:
     - affichage d'un résumé des scores dans la console.
     """
     setup_ragas_logging()
-    logfire.configure()
+    logfire.configure(send_to_logfire=False)
 
     logger.info("=== Début du script evaluate_ragas ===")
 

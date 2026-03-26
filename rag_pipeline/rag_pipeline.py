@@ -30,7 +30,7 @@ from evaluate.core.schemas import RagPipelineOutput
 logger = logging.getLogger(__name__)
 
 # Initialisation de Logfire pour tracer les étapes du pipeline RAG
-logfire.configure()
+logfire.configure(send_to_logfire=False)
 
 # --- Configuration de l'API Mistral ---
 if not MISTRAL_API_KEY:
