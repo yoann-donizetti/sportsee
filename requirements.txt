@@ -28,7 +28,7 @@ langchain-mistralai==0.2.4
 # - wrapper LLM
 # - utilisé notamment par RAGAS pour l'évaluation
 
-langchain-core==0.3.52
+langchain-core==1.2.11
 # Cœur interne de LangChain :
 # - gestion des messages, prompts, callbacks
 # - nécessaire pour compatibilité avec les versions récentes
@@ -87,7 +87,7 @@ numpy==2.2.3
 # - embeddings
 # - traitement vectoriel
 
-requests==2.32.3
+requests==2.33.0
 # Appels HTTP (API, téléchargement de données)
 
 tqdm
