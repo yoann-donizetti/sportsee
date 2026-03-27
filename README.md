@@ -20,23 +20,44 @@ L’objectif est de construire un système capable de :
 
 ---
 
-##  Architecture
 
-Le système s’appuie sur un pipeline RAG structuré en plusieurs étapes :
+
+## Architecture du système
+
+Le projet repose sur une architecture hybride combinant :
+
+1. **Base de données (PostgreSQL)**
+   - stockage structuré des données NBA ;
+   - support pour les requêtes analytiques (SQL).
+
+2. **Pipeline RAG**
+   - récupération de contexte via FAISS ;
+   - génération de réponses avec Mistral.
+
+3. **Évaluation automatique**
+   - mesure de la qualité via RAGAS.
+
+---
+
+###  Pipeline RAG
+
+Le système s’appuie sur un pipeline structuré en plusieurs étapes :
 
 1. **Retrieval**
-   - indexation des données (FAISS)
-   - recherche des documents pertinents
+   - indexation des documents (FAISS) ;
+   - recherche des contenus les plus pertinents.
 
 2. **Context building**
-   - sélection et formatage des chunks
+   - sélection et agrégation des chunks ;
+   - construction du contexte envoyé au modèle.
 
 3. **Generation**
-   - appel au modèle Mistral
-   - production de la réponse
+   - appel au modèle Mistral ;
+   - production de la réponse finale.
 
 4. **Validation**
-   - structuration des sorties avec Pydantic
+   - structuration des sorties avec Pydantic ;
+   - contrôle du format et de la cohérence.
 
 5. **Évaluation**
    - scoring avec RAGAS :
@@ -46,6 +67,49 @@ Le système s’appuie sur un pipeline RAG structuré en plusieurs étapes :
      - context recall
 
 ---
+
+###  Vision cible
+
+Faire évoluer le système vers une architecture hybride complète :
+
+- **SQL** → réponses fiables, calculs précis, données structurées  
+- **RAG** → contexte, explication, enrichissement  
+
+Cette approche permet :
+- de réduire les hallucinations ;
+- d’améliorer la précision des réponses ;
+- d’augmenter la robustesse globale du système.
+
+
+
+##  Base de données (PostgreSQL)
+
+Le projet s’appuie également sur une base de données PostgreSQL pour stocker :
+
+- les données structurées (équipes, joueurs, statistiques) ;
+- les données textuelles (rapports Reddit / PDF) ;
+- les futures données match par match.
+
+### Tables principales
+
+- `teams` : équipes NBA
+- `players` : joueurs et affiliation équipe
+- `stats` : statistiques agrégées par joueur
+- `reports` : contenus textuels (RAG)
+
+### Rôle dans le système
+
+- PostgreSQL permet de répondre à des questions **fiables et chiffrées**
+- le RAG permet d’apporter du **contexte et de l’interprétation**
+
+Le système évolue vers une architecture hybride :
+- SQL → précision et fiabilité des données
+- RAG → enrichissement et compréhension du contexte
+
+### Documentations
+- [README](database/README.md)
+- [SCHEMA SQL](docs/schema_sql.md)
+
 
 ##  Résultats (Baseline)
 
@@ -73,49 +137,64 @@ même lorsque l'information n'est pas disponible.
 ##  Structure du projet
 ```bash
 
-nba-analyst-ai/
-├── docs/                         # Documentation, rapports d'analyse
-│   └── rapport_ragas_baseline.md
+sportsee/
 │
-├── evaluate/                     # Évaluation automatique du système
-│   ├── core/
-│   │   ├── cleaning.py
-│   │   ├── dataset_loader.py
-│   │   ├── ragas_builder.py
-│   │   ├── ragas_runner.py
-│   │   ├── safe_mistral.py
-│   │   ├── saver.py
-│   │   └── schemas.py
-│   │
-│   ├── datasets/
-│   │   └── rag_eval_dataset.json
-│   │
-│   ├── results/
-│   │   ├── ragas_results.csv
-│   │   └── ragas_summary.json
-│   │
-│   └── scripts/
-│       └── evaluate_ragas.py
+├── indexer.py                    # Script principal d’indexation des documents
+├── MistralChat.py                # Interface utilisateur Streamlit pour interroger le système
+│
+├── database/                     # Gestion de la base PostgreSQL
+│   ├── init_db.sql               # Initialisation de la base, de l’utilisateur et des droits
+│   ├── schema.sql                # Création du schéma SQL (tables, contraintes, index, commentaires)
+│   ├── schemas.py                # Schémas Pydantic pour valider les données avant insertion
+│   ├── load_excel_to_db.py       # Chargement des données structurées Excel dans PostgreSQL
+│   ├── load_reports.py           # Chargement des rapports PDF Reddit dans PostgreSQL
+|   ├── db_utils.py               # Fonctions utilitaires pour l'accès et la gestion de la base de données
+│   └── README.md                 # Documentation technique dédiée à la base de données
 │
 ├── rag_pipeline/                 # Pipeline RAG principal
-│   ├── config.py
-│   ├── rag_pipeline.py
-│   └── vector_store.py
+│   ├── config.py                 # Configuration globale du projet (modèles, chemins, DB, etc.)
+│   ├── rag_pipeline.py           # Logique de retrieval, construction de contexte et génération
+│   └── vector_store.py           # Gestion de l’index FAISS et de la recherche sémantique
 │
-├── utils/                        # Fonctions utilitaires
-│   ├── data_loader.py
-│   └── logging_config.py
+├── evaluate/                     # Évaluation automatique du système avec RAGAS
+│   ├── core/                     # Modules internes de préparation et d’évaluation
+│   │   ├── cleaning.py           # Nettoyage / préparation des données d’évaluation
+│   │   ├── dataset_loader.py     # Chargement du dataset d’évaluation
+│   │   ├── ragas_builder.py      # Construction des objets nécessaires à RAGAS
+│   │   ├── ragas_runner.py       # Lancement des métriques RAGAS
+│   │   ├── safe_mistral.py       # Appels sécurisés au modèle Mistral
+│   │   ├── saver.py              # Sauvegarde des résultats d’évaluation
+│   │   └── schemas.py            # Validation Pydantic des données d’évaluation
+│   │
+│   ├── datasets/                 # Jeux de test pour l’évaluation
+│   │   └── rag_eval_dataset.json # Dataset de questions métier
+│   │
+│   ├── results/                  # Résultats générés par les évaluations
+│   │   └── baseline/             # Résultats de la baseline initiale
+│   │       ├── ragas_results.csv # Résultats détaillés par question
+│   │       └── ragas_summary.json# Résumé global des scores
+│   │
+│   └── scripts/                  # Scripts exécutables d’évaluation
+│       └── evaluate_ragas.py     # Script principal de lancement RAGAS
 │
-├── inputs/                       # Données sources à indexer
+├── utils/                        # Fonctions utilitaires partagées
+│   ├── data_loader.py            # Chargement et parsing multi-format (PDF, OCR, Excel, TXT, CSV…)
+│   └── logging_config.py         # Configuration centralisée du logging
 │
-├── vector_db/                    # Index FAISS (non versionné, généré automatiquement)
-│   └── faiss_index.idx
+├── docs/                         # Documentation et rapports
+│   ├── rapport_ragas_baseline.md # Rapport d’analyse de la baseline RAGAS
+│   └── schema_sql.md             # Description fonctionnelle du schéma SQL
 │
-├── indexer.py                    # Script d'indexation
-├── MistralChat.py                # Interface utilisateur (Streamlit)
-├── requirements.txt
-├── README.md
-└── .gitignore
+├── inputs/                       # Données sources du projet
+│                                 # - fichier Excel NBA
+│                                 # - PDF Reddit / rapports
+│
+├── vector_db/                    # Index vectoriel FAISS généré automatiquement
+│   └── faiss_index.idx           # Fichier d’index utilisé pour le retrieval
+│
+├── requirements.txt              # Dépendances Python du projet
+├── README.md                     # Documentation principale du projet
+└── .gitignore                    # Fichiers et dossiers ignorés par Git
 ```
 ---
 
@@ -216,8 +295,19 @@ Créer un fichier .env :
 
 MISTRAL_API_KEY=your_api_key
 
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=sportsee
+DB_USER=sportsee_user
+DB_PASSWORD=your_password
+
 ## Exécution du projet
-### 1. Ajouter des documents
+### 1. Initialiser la base de données
+```bash
+psql -U postgres -f database/init_db.sql
+```
+
+### 2. Ajouter des documents
 
 Placez vos documents dans le dossier `inputs/`. Les formats supportés sont :
 - PDF
@@ -228,8 +318,21 @@ Placez vos documents dans le dossier `inputs/`. Les formats supportés sont :
 
 Les documents peuvent être organisés dans des sous-dossiers pour faciliter le classement des sources.
 
+###  3. Charger les données dans PostgreSQL
 
-### 2. Indexer les documents
+Données structurées (Excel)
+```bash
+python -m database.load_excel_to_db
+```
+
+Données textuelles (PDF / Reddit)
+
+```bash
+python -m database.load_reports
+```
+
+
+### 4. Indexer les documents
 
 Exécutez le script d’indexation pour parser les fichiers, créer les chunks, générer les embeddings et construire l’index FAISS :
 
@@ -244,7 +347,7 @@ Ce script va :
 4. Créer un index FAISS pour la recherche sémantique
 5. Sauvegarder l'index et les chunks dans le dossier `vector_db/`
 
-### 3. Lancer l'application
+### 5. Lancer l'application
 
 ```bash
 streamlit run MistralChat.py
@@ -253,7 +356,7 @@ streamlit run MistralChat.py
 L'application sera accessible à l'adresse http://localhost:8501 dans votre navigateur.
 
 
-### 4. Lancer l'évaluation RAGAS 
+### 6. Lancer l'évaluation RAGAS 
 
 ```bash
 python -m evaluate.scripts.evaluate_ragas
