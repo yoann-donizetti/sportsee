@@ -414,3 +414,39 @@ Les priorités sont les suivantes :
 
 
 Cette baseline met en évidence un système convaincant mais encore insuffisamment fiable pour un usage métier critique, justifiant l’intégration d’un Tool SQL et l’amélioration du pipeline RAG.
+
+
+## Transition vers l’amélioration du système
+
+### 1. Cadrer le besoin métier
+**Objectif de cette phase :**
+- Rendre le système capable de répondre de manière fiable aux questions chiffrées, comparatives et agrégées, là où le RAG textuel seul montre ses limites.
+
+**Constat de départ :**
+- le système comprend globalement bien les questions ;
+- mais il hallucine sur certaines données numériques ;
+- il ne sait pas toujours distinguer une information présente d’une information absente ;
+- il reste insuffisant pour les questions nécessitant des calculs, tris ou agrégations.
+
+
+**Questions typiques à couvrir :**
+- meilleur % à 3 points ;
+- plus de rebonds ;
+- plus de passes ;
+- comparaison domicile / extérieur ;
+- comparaison sur période ;
+- combinaison de statistiques.
+
+
+**Réponse attendue du système :**
+- le LLM ne “devine” plus ;
+- il interroge une base de données structurée ;
+- il s’appuie sur un résultat SQL traçable ;
+- il reformule une réponse fiable en langage naturel.
+
+
+**Résultat attendu :**
+- amélioration de la fiabilité sur les questions numériques ;
+- réduction des hallucinations ;
+- meilleure robustesse du système sur les cas métier ;
+- base de comparaison pour la seconde évaluation avant / après intégration du SQL Tool.

@@ -32,6 +32,8 @@ VECTOR_DB_DIR = os.path.join(BASE_DIR, "vector_db")
 DATABASE_DIR = os.path.join(BASE_DIR, "database")
 EVALUATE_DIR = os.path.join(BASE_DIR, "evaluate")
 
+EXCEL_FILE = os.path.join(INPUT_DIR, "regular NBA.xlsx")
+SCHEMA_FILE = os.path.join(DATABASE_DIR, "schema.sql")
 # ======================================================
 #  Vector Store / Indexation
 # ======================================================
@@ -54,8 +56,19 @@ DEFAULT_MIN_SCORE = None
 #  Base de données
 # ======================================================
 
-DATABASE_FILE = os.path.join(DATABASE_DIR, "interactions.db")
-DATABASE_URL = f"sqlite:///{DATABASE_FILE}"
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+DATABASE_URL = (
+    f"postgresql+psycopg2://"
+    f"{DB_USER}:{DB_PASSWORD}"
+    f"@{DB_HOST}:{DB_PORT}"
+    f"/{DB_NAME}"
+)
+
 
 # ======================================================
 #  Application
