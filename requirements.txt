@@ -24,7 +24,7 @@ langchain==0.3.23
 # - gestion des chaînes (chains)
 # - intégration des composants
 
-langchain-core==0.3.52
+langchain-core==1.2.22
 # Composants internes LangChain :
 # - prompts
 # - messages
@@ -107,7 +107,7 @@ numpy==2.2.3
 # - manipulation de tableaux
 # - support des embeddings
 
-requests==2.32.3
+requests==2.33.0
 # Requêtes HTTP :
 # - appels API
 # - récupération de données
