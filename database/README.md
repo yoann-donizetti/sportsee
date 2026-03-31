@@ -155,6 +155,22 @@ python -m database.load_reports
 Cette table est prévue pour intégrer plus tard des données match par match.
 Elle est présente dans le schéma mais n’est pas encore alimentée dans la version actuelle.
 
+## Utilisateur lecture seule pour le tool SQL
+
+Pour sécuriser l’exécution des requêtes générées par le LLM, un utilisateur PostgreSQL dédié en lecture seule peut être créé.
+
+Ce compte permet :
+- d’interroger les tables nécessaires au tool SQL ;
+- d’empêcher toute modification accidentelle de la base.
+
+Script SQL associé :
+- [create_readonly_user.sql](create_readonly_user.sql)
+
+Exécution :
+```bash
+psql -U postgres -d sportsee -f database/create_readonly_user.sql
+```
+
 
 ## Limites actuelles
 Le dataset Excel utilisé contient des statistiques agrégées par joueur.
