@@ -81,6 +81,16 @@ Returns:
         "je ne peux pas déterminer",
         "non évaluable",
         "information non disponible",
+        "je ne peux pas répondre",
+        "je ne dispose pas",
+        "je n'ai pas",
+        "aucune donnée",
+        "non disponible",
+        "refus",
+        "je ne peux pas fournir",
+        "je ne suis pas en mesure",
+        "je ne suis pas capable",
+        "je ne suis pas sûr",
     ]
 
     answer_lower = answer.lower()

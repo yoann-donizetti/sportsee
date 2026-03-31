@@ -40,7 +40,11 @@ from .config import (
 )
 from .vector_store import VectorStoreManager
 from evaluate.core.schemas import RagPipelineOutput
-from rag_pipeline.router import is_sql_question,is_unsupported_question
+from rag_pipeline.router import (
+    is_sql_question,
+    is_unsupported_question,
+    is_noisy_question,
+)
 from rag_pipeline.tools.sql_tool import sql_tool
 from rag_pipeline.llm_utils import ask_mistral,build_refusal_answer
 
@@ -169,7 +173,6 @@ def synthesize_sql_answer(question: str, rows: list[dict]) -> str:
         temperature=SQL_TEMPERATURE,
     )
 
-
 def poser_question(
     prompt: str,
     vector_store_manager: Optional[VectorStoreManager] = None,
@@ -192,7 +195,24 @@ def poser_question(
             final_prompt_for_llm="",
             messages_for_api=[],
         )
-        logger.info("Route choisie : REFUS")
+        logger.info("Route choisie : REFUS_UNSUPPORTED")
+        return result.model_dump()
+
+    # =========================================================
+    # Questions bruitées / trop imprécises
+    # =========================================================
+    if is_noisy_question(prompt):
+        logger.info("Question bruitée détectée : %s", prompt)
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=build_refusal_answer(prompt),
+            search_results=[],
+            context_str="",
+            final_prompt_for_llm="",
+            messages_for_api=[],
+        )
+        logger.info("Route choisie : REFUS_NOISY")
         return result.model_dump()
 
     # =========================================================
@@ -260,6 +280,7 @@ def poser_question(
             "Résultats de recherche",
             n_chunks=len(search_results),
         )
+
     except Exception:
         logger.exception(
             "Erreur pendant vector_store_manager.search pour la query: %s",
@@ -301,88 +322,6 @@ def poser_question(
     )
     logger.info("Route choisie : RAG")
 
-    result = RagPipelineOutput(
-        question=prompt,
-        answer=response_content,
-        search_results=search_results,
-        context_str=context_str,
-        final_prompt_for_llm=final_prompt_for_llm,
-        messages_for_api=[
-            {"role": msg.role, "content": msg.content}
-            for msg in messages_for_api
-        ],
-    )
-
-    return result.model_dump() 
-
-    # =========================================================
-    # Pipeline RAG actuel
-    # =========================================================
-    if vector_store_manager is None:
-        vector_store_manager = get_vector_store_manager()
-
-    if vector_store_manager is None:
-        logger.error("VectorStoreManager non disponible pour la recherche.")
-
-        result = RagPipelineOutput(
-            question=prompt,
-            answer=RAG_UNAVAILABLE_MESSAGE,
-            search_results=[],
-            context_str="",
-            final_prompt_for_llm="",
-            messages_for_api=[],
-        )
-        return result.model_dump()
-
-    try:
-        logger.info("Recherche de contexte pour la question: '%s' avec k=%s", prompt, k)
-        search_results = vector_store_manager.search(prompt, k=k)
-        logger.info("%s chunks trouvés dans le Vector Store.", len(search_results))
-
-        logfire.info(
-            "Résultats de recherche",
-            n_chunks=len(search_results),
-        )
-    except Exception:
-        logger.exception(
-            "Erreur pendant vector_store_manager.search pour la query: %s",
-            prompt,
-        )
-        search_results = []
-
-        logfire.info(
-            "Résultats de recherche",
-            n_chunks=0,
-        )
-
-    context_str = construire_contexte(search_results)
-
-    logfire.info(
-        "Contexte construit",
-        longueur=len(context_str),
-    )
-
-    if not search_results:
-        logger.warning("Aucun contexte trouvé pour la query: %s", prompt)
-
-    final_prompt_for_llm = construire_prompt(prompt, context_str)
-
-    logfire.info(
-        "Prompt généré",
-        longueur=len(final_prompt_for_llm),
-    )
-
-    messages_for_api = [
-        ChatMessage(role="user", content=final_prompt_for_llm)
-    ]
-
-    response_content = generer_reponse(messages_for_api)
-
-    logfire.info(
-        "Réponse générée",
-        longueur=len(response_content),
-    )
-    logger.info("Route choisie : RAG")
     result = RagPipelineOutput(
         question=prompt,
         answer=response_content,

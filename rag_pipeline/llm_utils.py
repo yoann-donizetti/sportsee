@@ -46,5 +46,8 @@ def build_refusal_answer(question: str) -> str:
             "Je ne dispose pas de données séparées domicile/extérieur dans les informations disponibles."
         )
 
-    # Cas inconnu / bruit / hors scope
+    # Cas question trop vague / bruitée
+    if len(q.split()) < 5:
+        return "Je ne peux pas répondre car la question est trop imprécise."
+
     return REFUSAL_MESSAGE
