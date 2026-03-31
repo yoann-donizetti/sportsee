@@ -145,6 +145,13 @@ Le système utilise un mécanisme de routing simple pour orienter les questions 
 
 Ce routing permet d'améliorer la pertinence des réponses en utilisant le bon outil selon le type de question.
 
+## Exemples de questions
+
+- Qui sont les 5 meilleurs scoreurs ?
+- Quel joueur a le plus de rebonds ?
+- Quelle équipe a le meilleur offensive rating ?
+- Pourquoi Indiana impressionne cette saison ?
+
 ##  Résultats (Baseline)
 
 | Metric              | Score |
