@@ -1,0 +1,107 @@
+[
+  {
+    "id": 1,
+    "question": "Quel joueur a le meilleur ratio points par match ?",
+    "ground_truth": "Le joueur avec le meilleur ratio points par match est Shai Gilgeous-Alexander.",
+    "category": "factuel_simple",
+    "answerable": true
+  },
+  {
+    "id": 2,
+    "question": "Quelle équipe a marqué le plus de points au total ?",
+    "ground_truth": "L'équipe avec le plus de points est Oklahoma City Thunder.",
+    "category": "factuel_simple",
+    "answerable": true
+  },
+  {
+    "id": 3,
+    "question": "Quel joueur est le plus complet entre points, rebonds et passes ?",
+    "ground_truth": "Nikola Jokic est considéré comme le joueur le plus complet sur ces trois dimensions.",
+    "category": "factuel_complexe",
+    "answerable": true
+  },
+  {
+    "id": 4,
+    "question": "Compare les performances offensives de deux joueurs majeurs.",
+    "ground_truth": "Les performances offensives varient selon les joueurs, mais certains comme Jokic ou Shai se distinguent en points et efficacité.",
+    "category": "comparaison",
+    "answerable": true
+  },
+  {
+    "id": 5,
+    "question": "Quels joueurs sont les plus mentionnés dans les discussions Reddit ?",
+    "ground_truth": "Les joueurs comme LeBron James, Stephen Curry et Nikola Jokic sont fréquemment mentionnés.",
+    "category": "subjectif",
+    "answerable": true
+  },
+  {
+    "id": 6,
+    "question": "Quel est le meilleur joueur NBA actuellement selon les fans ?",
+    "ground_truth": "Il n'y a pas de consensus, mais Jokic, Giannis et Luka sont souvent cités.",
+    "category": "subjectif",
+    "answerable": true
+  },
+  {
+    "id": 7,
+    "question": "nba meilleur joueur truc stats qui gagne",
+    "ground_truth": "Question bruitée difficile à interpréter correctement.",
+    "category": "bruit",
+    "answerable": false
+  },
+  {
+    "id": 8,
+    "question": "Quel joueur a marqué le plus de points sur la saison ?",
+    "ground_truth": "Shai Gilgeous-Alexander (OKC) avec 2485 points.",
+    "category": "factuel_simple",
+    "answerable": true
+  },
+  {
+    "id": 9,
+    "question": "Quel joueur a le meilleur pourcentage à 3 points sur la saison ?",
+    "ground_truth": "Seth Curry (CHA) avec 45,6 % à 3 points.",
+    "category": "factuel_simple",
+    "answerable": true
+  },
+  {
+    "id": 10,
+    "question": "Quel joueur a pris le plus de rebonds sur la saison ?",
+    "ground_truth": "Ivica Zubac (LAC) avec 1008 rebonds.",
+    "category": "factuel_simple",
+    "answerable": true
+  },
+  {
+    "id": 11,
+    "question": "Quel joueur a délivré le plus de passes décisives sur la saison ?",
+    "ground_truth": "Trae Young (ATL) avec 882 passes décisives.",
+    "category": "factuel_simple",
+    "answerable": true
+  },
+  {
+    "id": 12,
+    "question": "Quel joueur combine le plus de points et de passes décisives ?",
+    "ground_truth": "Shai Gilgeous-Alexander (OKC), avec 2971 au total (2485 points et 486 passes décisives).",
+    "category": "factuel_complexe",
+    "answerable": true
+  },
+  {
+    "id": 13,
+    "question": "Quel joueur a le meilleur pourcentage de réussite à 3 points sur les 5 derniers matchs ?",
+    "ground_truth": "Non évaluable avec le dataset actuel, car les données par match et sur les 5 derniers matchs ne sont pas disponibles.",
+    "category": "unsupported",
+    "answerable": false
+  },
+  {
+    "id": 14,
+    "question": "Compare les statistiques de rebonds de l'équipe à domicile et à l'extérieur.",
+    "ground_truth": "Non évaluable avec le dataset actuel, car la distinction domicile/extérieur n'est pas disponible.",
+    "category": "unsupported",
+    "answerable": false
+  },
+  {
+  "id": 15,
+  "question": "Quelle est la différence de performance entre les joueurs les plus scoreurs et les meilleurs passeurs ?",
+  "ground_truth": "Les joueurs les plus scoreurs comme Shai Gilgeous-Alexander se distinguent en points, tandis que les meilleurs passeurs comme Trae Young excellent en création de jeu. Les profils sont complémentaires mais différents.",
+  "category": "comparaison",
+  "answerable": true
+}
+]
