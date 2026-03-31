@@ -120,3 +120,102 @@ SUPPORTED_INPUT_EXTENSIONS = [
     ".xlsx",
     ".xls",
 ]
+
+# ======================================================
+#  Paramètres de prompts et messages
+# ======================================================
+
+
+
+
+
+# Prompts
+
+
+RAG_SYSTEM_PROMPT_TEMPLATE = """
+Tu es '{name} Analyst AI', un assistant expert sur la NBA.
+
+Ton objectif est de fournir des réponses fiables, basées uniquement sur les données disponibles.
+
+RÈGLES IMPORTANTES :
+
+1. Tu dois répondre UNIQUEMENT à partir du contexte fourni.
+2. Si l'information n'est pas présente dans le contexte, tu dois REFUSER de répondre.
+3. Tu ne dois JAMAIS inventer de statistiques ou de faits.
+4. Si la question est imprécise, ambiguë ou bruitée, tu dois refuser.
+5. Les données disponibles sont statiques (snapshot).
+   Tu ne dois PAS faire d'analyse temporelle (évolution, derniers matchs, tendances).
+   Si la question nécessite une dimension temporelle, tu dois refuser.
+6. Tes réponses doivent être :
+   - claires
+   - courtes
+   - factuelles
+   - sans blabla inutile
+
+---
+
+CONTEXTE :
+{context_str}
+
+---
+
+QUESTION :
+{question}
+
+---
+
+RÉPONSE :
+"""
+
+SQL_SYNTHESIS_PROMPT_TEMPLATE = """
+Tu es un assistant expert NBA.
+
+Question :
+{question}
+
+Résultats :
+{rows}
+
+Ta mission :
+- Reformule une réponse claire en français
+- Sois concis
+- Ne mentionne pas SQL
+- Utilise uniquement les résultats fournis
+
+Réponse :
+"""
+
+
+# Paramètres modèle
+
+
+RAG_TEMPERATURE = 0.1
+SQL_TEMPERATURE = 0.2
+
+
+# Messages système
+
+
+RAG_UNAVAILABLE_MESSAGE = (
+    "Le service de recherche de connaissances n'est pas disponible. "
+    "Impossible de traiter votre demande."
+)
+
+SQL_ERROR_MESSAGE = "Une erreur est survenue pendant l'interrogation SQL."
+SQL_NO_RESULT_MESSAGE = "Je n'ai trouvé aucun résultat pour cette question."
+
+EMPTY_PROMPT_MESSAGE = "Je ne peux pas traiter une demande vide."
+
+MISTRAL_ERROR_MESSAGE = (
+    "Je suis désolé, une erreur technique m'empêche de répondre. "
+    "Veuillez réessayer plus tard."
+)
+
+NO_RAG_CONTEXT_MESSAGE = (
+    "Aucune information pertinente trouvée dans la base de connaissances pour cette question."
+)
+
+REFUSAL_MESSAGE = (
+    "Je ne peux pas répondre de manière fiable à cette question avec les données actuellement "
+    "disponibles."
+)
