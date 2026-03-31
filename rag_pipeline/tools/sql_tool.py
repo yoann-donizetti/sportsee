@@ -6,8 +6,8 @@ from typing import List, Dict, Any
 
 from sqlalchemy import create_engine, text
 
-from rag_pipeline.config import DATABASE_URL_LLM, MISTRAL_API_KEY, MODEL_NAME
-from mistralai.client import MistralClient
+from rag_pipeline.config import MODEL_NAME,DATABASE_URL_LLM
+from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +19,6 @@ logger = logging.getLogger(__name__)
 engine = create_engine(DATABASE_URL_LLM)
 
 
-# =========================================================
-# LLM (Mistral)
-# =========================================================
-
-client = MistralClient(api_key=MISTRAL_API_KEY)
 
 
 # =========================================================
@@ -187,17 +182,7 @@ def generate_sql_query(question: str) -> str:
     """Génère une requête SQL à partir d'une question utilisateur via Mistral."""
     prompt = build_sql_prompt(question)
 
-    response = client.chat(
-        model=MODEL_NAME,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],temperature=0,
-    )
-
-    sql_query = response.choices[0].message.content
+    sql_query = ask_mistral(prompt, model=MODEL_NAME)
     sql_query = clean_llm_sql_output(sql_query)
 
     return sql_query

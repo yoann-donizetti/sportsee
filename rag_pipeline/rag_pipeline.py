@@ -26,6 +26,9 @@ from mistralai.models.chat_completion import ChatMessage
 from .config import MISTRAL_API_KEY, MODEL_NAME, NAME, SEARCH_K
 from .vector_store import VectorStoreManager
 from evaluate.core.schemas import RagPipelineOutput
+from rag_pipeline.router import is_sql_question, format_sql_result
+from rag_pipeline.tools.sql_tool import sql_tool
+from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
 
@@ -175,19 +178,81 @@ def construire_prompt(question: str, context_str: str) -> str:
     """
     return SYSTEM_PROMPT.format(context_str=context_str, question=question)
 
+def synthesize_sql_answer(question: str, rows: list[dict]) -> str:
+    """Reformule les résultats SQL en réponse naturelle."""
+    if not rows:
+        return "Je n'ai trouvé aucun résultat pour cette question."
+
+    prompt = f"""
+Tu es un assistant expert NBA.
+
+Question :
+{question}
+
+Résultats SQL :
+{rows}
+
+Ta mission :
+- Reformule une réponse claire en français
+- Sois naturel et concis
+- Si plusieurs lignes, fais une phrase fluide
+- Ne mentionne pas SQL
+- Utilise uniquement les résultats fournis
+
+Réponse :
+""".strip()
+
+    return ask_mistral(prompt, model=MODEL_NAME)
+
 
 def poser_question(
     prompt: str,
     vector_store_manager: Optional[VectorStoreManager] = None,
     k: int = SEARCH_K,
 ) -> dict:
-    """Exécute la logique RAG complète pour une question."""
+    """Exécute la logique hybride SQL + RAG pour une question."""
     logfire.info("Question utilisateur", question=prompt)
 
+    # =========================================================
+    # Routage SQL
+    # =========================================================
+    if is_sql_question(prompt):
+        logger.info("Question détectée comme SQL : %s", prompt)
+
+        try:
+            sql_results = sql_tool(prompt)
+            sql_answer = synthesize_sql_answer(prompt, sql_results)
+
+            result = RagPipelineOutput(
+                question=prompt,
+                answer=sql_answer,
+                search_results=[],
+                context_str="",
+                final_prompt_for_llm="",
+                messages_for_api=[],
+            )
+            logger.info("Route choisie : SQL")
+            return result.model_dump()
+
+        except Exception:
+            logger.exception("Erreur pendant l'exécution du SQL tool pour la question : %s", prompt)
+
+            result = RagPipelineOutput(
+                question=prompt,
+                answer="Une erreur est survenue pendant l'interrogation SQL.",
+                search_results=[],
+                context_str="",
+                final_prompt_for_llm="",
+                messages_for_api=[],
+            )
+            return result.model_dump()
+
+    # =========================================================
+    # Pipeline RAG actuel
+    # =========================================================
     if vector_store_manager is None:
         vector_store_manager = get_vector_store_manager()
 
-    # Cas erreur : vector store indisponible
     if vector_store_manager is None:
         logger.error("VectorStoreManager non disponible pour la recherche.")
 
@@ -204,7 +269,6 @@ def poser_question(
         )
         return result.model_dump()
 
-    # Recherche
     try:
         logger.info("Recherche de contexte pour la question: '%s' avec k=%s", prompt, k)
         search_results = vector_store_manager.search(prompt, k=k)
@@ -226,7 +290,6 @@ def poser_question(
             n_chunks=0,
         )
 
-    # Construction contexte
     context_str = construire_contexte(search_results)
 
     logfire.info(
@@ -237,7 +300,6 @@ def poser_question(
     if not search_results:
         logger.warning("Aucun contexte trouvé pour la query: %s", prompt)
 
-    # Prompt
     final_prompt_for_llm = construire_prompt(prompt, context_str)
 
     logfire.info(
@@ -249,15 +311,13 @@ def poser_question(
         ChatMessage(role="user", content=final_prompt_for_llm)
     ]
 
-    # Génération réponse
     response_content = generer_reponse(messages_for_api)
 
     logfire.info(
         "Réponse générée",
         longueur=len(response_content),
     )
-
-    # Validation Pydantic
+    logger.info("Route choisie : RAG")
     result = RagPipelineOutput(
         question=prompt,
         answer=response_content,

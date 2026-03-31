@@ -111,6 +111,40 @@ Le système évolue vers une architecture hybride :
 - [SCHEMA SQL](docs/schema_sql.md)
 
 
+
+## SQL Tool (questions chiffrées)
+
+Le système intègre un SQL Tool permettant de répondre aux questions nécessitant des données chiffrées.
+
+Fonctionnement :
+
+- détection des questions chiffrées (routing)
+- génération d'une requête SQL via le LLM
+- validation de la requête (SELECT uniquement)
+- exécution sur PostgreSQL (lecture seule)
+- synthèse des résultats en langage naturel
+
+Exemples :
+
+- "Qui sont les meilleurs scoreurs ?"
+- "Quel joueur a le plus de rebonds ?"
+
+Ce module permet :
+
+- d'améliorer la précision
+- de réduire les hallucinations
+- de garantir la fiabilité des données numériques
+
+## Routing des requêtes
+
+Le système utilise un mécanisme de routing simple pour orienter les questions :
+
+- Questions chiffrées → SQL Tool
+- Questions textuelles → RAG
+- Questions hybrides → limitation actuelle
+
+Ce routing permet d'améliorer la pertinence des réponses en utilisant le bon outil selon le type de question.
+
 ##  Résultats (Baseline)
 
 | Metric              | Score |
@@ -381,6 +415,9 @@ Le système est testé sur :
 - hallucinations sur certaines questions
 - mauvaise gestion des données absentes
 - retrieval perfectible (bruit + manque de précision)
+- gestion imparfaite des questions hybrides (SQL + RAG)
+- dépendance au mapping langage naturel → SQL
+- absence de fallback intelligent en cas d'erreur SQL
 
 
 ## Améliorations prévues
