@@ -68,6 +68,14 @@ DATABASE_URL = (
     f"@{DB_HOST}:{DB_PORT}"
     f"/{DB_NAME}"
 )
+DB_USER_URL = os.getenv("DB_LLM_USER")
+DB_PASSWORD_URL = os.getenv("DB_LLM_PASSWORD")
+DATABASE_URL_LLM = (
+    f"postgresql+psycopg2://"
+    f"{DB_USER_URL}:{DB_PASSWORD_URL}"
+    f"@{DB_HOST}:{DB_PORT}"
+    f"/{DB_NAME}"
+)
 
 
 # ======================================================
