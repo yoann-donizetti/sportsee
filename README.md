@@ -100,6 +100,228 @@ Cette approche permet :
 - de mieux aligner la réponse avec le type réel de question posé.
 
 
+### Schéma d’architecture
+
+Le système repose sur une architecture hybride combinant plusieurs composants :
+
+```text
+                ┌──────────────────────────────┐
+                │        Streamlit UI          │
+                │   (interface utilisateur)    │
+                └──────────────┬───────────────┘
+                               │
+                               ▼
+                ┌──────────────────────────────┐
+                │        API FastAPI           │
+                │   (routing + orchestration)  │
+                └──────────────┬───────────────┘
+                               │
+        ┌──────────────────────┼──────────────────────┐
+        ▼                      ▼                      ▼
+┌───────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   SQL Tool    │     │   Pipeline RAG    │     │     REFUS        │
+│ (PostgreSQL)  │     │ (FAISS + Mistral)│     │ (fallback safe)  │
+└──────┬────────┘     └────────┬─────────┘     └────────┬────────┘
+       │                        │                        │
+       ▼                        ▼                        ▼
+┌───────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│ Base SQL NBA  │     │  Vector Store     │     │  Réponse refus   │
+│ (données)     │     │  (documents)      │     │  contrôlé        │
+└───────────────┘     └──────────────────┘     └─────────────────┘
+```
+#### Fonctionnement global
+L’utilisateur pose une question via Streamlit
+- La requête est envoyée à l’API FastAPI
+- Le système analyse la question (routing) :
+   - SQL → données structurées (statistiques NBA)
+   - RAG → contexte textuel (reports, Reddit)
+   - REFUS → si la question est hors périmètre
+- Le moteur sélectionné génère la réponse
+- L’API renvoie la réponse à Streamlit
+
+#### Avantages de cette architecture
+- séparation claire des responsabilités
+- meilleure maintenabilité
+- réduction des hallucinations
+- réponses adaptées au type de question
+- système scalable (API réutilisable)
+
+#### Limites actuelles
+- routing perfectible (cas hybrides)
+- dépendance au mapping NL → SQL
+-évaluation RAGAS partiellement adaptée aux systèmes hybrides
+
+
+## API REST
+
+Le système est exposé via une API REST construite avec **FastAPI**.
+
+Cette API permet :
+
+- d’interroger le système avec une question utilisateur ;
+- de vérifier l’état du service ;
+- de recharger les données ;
+- de reconstruire l’index vectoriel ;
+- de relancer le pipeline complet.
+
+### Lancement de l’API
+
+```bash
+uvicorn api.main:app --reload
+```
+
+Par défaut, l’API est accessible à l’adresse :
+
+```text
+http://127.0.0.1:8000
+```
+Documentation interactive
+FastAPI génère automatiquement une documentation Swagger :
+
+```text
+http://127.0.0.1:8000/docs
+http://127.0.0.1:8000/redoc
+```
+
+#### Endpoints principaux
+
+**GET /health**
+> Vérifie que l’API fonctionne correctement.
+>
+> **Réponse exemple :**
+> ```json
+> {
+>   "status": "ok"
+> }
+> ```
+
+**POST /ask**
+> Permet de poser une question au système. Le routing interne oriente automatiquement la question vers :
+> - SQL pour les questions chiffrées et analytiques
+> - RAG pour les questions textuelles et contextuelles
+> - REFUS pour les questions hors périmètre ou non supportées
+>
+> **Requête exemple :**
+> ```json
+> {
+>   "question": "Quel joueur a le plus de rebonds sur la saison ?"
+> }
+> ```
+> **Réponse exemple :**
+> ```json
+> {
+>   "question": "Quel joueur a le plus de rebonds sur la saison ?",
+>   "answer": "Le joueur ayant pris le plus de rebonds en une saison est Ivica Zubac, avec 1008 rebonds.",
+>   "route_used": "SQL",
+>   "sql_success": true
+> }
+> ```
+
+**POST /data/reload**
+> Recharge les données structurées et textuelles dans PostgreSQL (Excel, PDF, etc).
+>
+> **Réponse exemple :**
+> ```json
+> {
+>   "status": "ok",
+>   "message": "Données rechargées avec succès"
+> }
+> ```
+
+**POST /index/rebuild**
+> Reconstruit l’index vectoriel FAISS à partir des documents présents dans `inputs/`.
+>
+> **Réponse exemple :**
+> ```json
+> {
+>   "status": "ok",
+>   "message": "Index FAISS reconstruit avec succès"
+> }
+> ```
+
+**POST /system/rebuild**
+> Exécute le pipeline complet de reconstruction (rechargement des données + reconstruction de l’index).
+>
+> **Réponse exemple :**
+> ```json
+> {
+>   "status": "ok",
+>   "message": "Système entièrement reconstruit (data + index)"
+> }
+> ```
+
+---
+
+#### Tester l’API avec curl
+
+**Windows PowerShell**
+```powershell
+curl -X POST "http://127.0.0.1:8000/ask" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"question\":\"Quel joueur a le plus de rebonds sur la saison ?\"}"
+```
+
+**Linux / macOS**
+```bash
+curl -X POST "http://127.0.0.1:8000/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Quel joueur a le plus de rebonds sur la saison ?"}'
+```
+
+---
+
+### Interface Streamlit
+
+### Interface Streamlit
+
+L’interface Streamlit agit comme un client de l’API REST :
+
+- l’utilisateur saisit une question ;
+- Streamlit envoie une requête HTTP à l’endpoint `/ask` ;
+- l’API analyse la question (routing) ;
+- le système sélectionne SQL, RAG ou REFUS ;
+- la réponse est renvoyée et affichée dans l’interface.
+
+Cette séparation permet une architecture propre et scalable :
+Streamlit → API FastAPI → Pipeline hybride
+
+**Lancement de l’interface :**
+```bash
+streamlit run MistralChat.py
+```
+Par défaut, l’interface est accessible à l’adresse : [http://localhost:8501](http://localhost:8501)
+
+
+```
+
+---
+
+### Procédure complète d’exécution
+
+1. **Lancer l’API**
+   ```bash
+   uvicorn api.main:app --reload
+   ```
+2. **Lancer Streamlit**
+   ```bash
+   streamlit run MistralChat.py
+   ```
+3. **Tester le système**
+   - Quel joueur a le plus de rebonds sur la saison ?
+   - Quel joueur combine le plus de points et de passes décisives ?
+   - Quels joueurs sont les plus mentionnés dans les discussions Reddit ?
+   - Que disent les fans sur Haliburton ?
+   - Quel joueur a le meilleur pourcentage à 3 points sur les 5 derniers matchs ?
+
+Ces tests permettent de couvrir :
+- une route SQL
+- une route RAG
+- une route REFUS
+
+---
+
+> La racine `/` redirige vers `/docs` (documentation interactive FastAPI).
+
 
 ##  Base de données (PostgreSQL)
 
@@ -240,6 +462,9 @@ sportsee/
 ├── requirements.txt              # Dépendances Python du projet
 ├── README.md                     # Documentation principale du projet
 ├── .gitignore                    # Fichiers et dossiers ignorés par Git
+├── api/                         # API REST FastAPI (exposition du système, endpoints)
+│   ├── main.py                  # Point d'entrée principal de l'API FastAPI
+│   ├── schemas.py               # Schémas Pydantic pour validation des requêtes/réponses API
 │
 ├── database/                     # Gestion de la base PostgreSQL
 │   ├── create_readonly_user.sql  # Script SQL pour créer un utilisateur en lecture seule

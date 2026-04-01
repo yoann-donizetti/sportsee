@@ -1,22 +1,12 @@
 import streamlit as st
 import logging
+import requests
 
-from rag_pipeline.config import APP_TITLE, NAME
-from rag_pipeline.rag_pipeline import poser_question, get_vector_store_manager
+from rag_pipeline.config import APP_TITLE, NAME, API_URL
 from utils.logging_config import setup_logging
 
 setup_logging()
 logger = logging.getLogger(__name__)
-
-
-# --- Chargement du Vector Store (cache Streamlit) ---
-@st.cache_resource
-def load_vector_store():
-    return get_vector_store_manager()
-
-
-vector_store_manager = load_vector_store()
-
 
 # --- UI ---
 st.title(APP_TITLE)
@@ -45,32 +35,42 @@ if prompt := st.chat_input(f"Posez votre question sur la {NAME}..."):
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Vérif vector store
-    if vector_store_manager is None:
-        st.error("Le système RAG n'est pas disponible.")
-        logger.error("VectorStoreManager non disponible. Impossible de traiter la question.")
-        st.stop()
-
-    # Appel pipeline RAG (IMPORTANT)
+    # Appel API
     with st.chat_message("assistant"):
         placeholder = st.empty()
         placeholder.text("...")
 
-        result = poser_question(
-            prompt=prompt,
-            vector_store_manager=vector_store_manager
-        )
+        try:
+            payload = {"question": prompt}
 
-        response = result["answer"]
+            response_api = requests.post(API_URL, json=payload, timeout=120)
+            response_api.raise_for_status()
 
-        placeholder.write(response)
-        logger.info("Réponse générée (longueur=%s caractères)", len(response))
+            result = response_api.json()
+            response = result["answer"]
+            route_used = result.get("route_used", "")
+            sql_success = result.get("sql_success", False)
+
+            placeholder.write(response)
+            st.caption(f"Route utilisée : {route_used} | SQL success : {sql_success}")
+
+            logger.info("Réponse générée (longueur=%s caractères)", len(response))
+
+        except requests.exceptions.RequestException as e:
+            response = "Erreur : impossible de joindre l'API."
+            placeholder.error(response)
+            logger.error("Erreur appel API : %s", e)
+
+        except Exception as e:
+            response = "Erreur inattendue lors du traitement de la réponse."
+            placeholder.error(response)
+            logger.error("Erreur inattendue Streamlit : %s", e)
+
     # Ajout historique
     st.session_state.messages.append({
         "role": "assistant",
         "content": response
     })
 
-
 st.markdown("---")
-st.caption("Powered by Mistral AI & FAISS")
+st.caption("Powered by Mistral AI, FastAPI & FAISS")

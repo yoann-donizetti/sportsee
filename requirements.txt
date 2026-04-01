@@ -152,3 +152,20 @@ logfire
 # Monitoring du pipeline RAG :
 # - traçabilité des étapes
 # - analyse des erreurs
+
+
+# =========================================================
+# API REST (exposition du système)
+# =========================================================
+
+fastapi
+# Framework API moderne :
+# - création d'endpoints REST
+# - validation automatique avec Pydantic
+# - documentation Swagger intégrée
+
+
+uvicorn
+# Serveur ASGI :
+# - exécution de l’API FastAPI
+# - support du rechargement automatique (--reload)
