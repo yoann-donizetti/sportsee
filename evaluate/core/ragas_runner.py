@@ -81,6 +81,20 @@ Returns:
         "je ne peux pas déterminer",
         "non évaluable",
         "information non disponible",
+        "je ne peux pas répondre",
+        "je ne dispose pas",
+        "je n'ai pas",
+        "aucune donnée",
+        "non disponible",
+        "refus",
+        "je ne peux pas fournir",
+        "je ne suis pas en mesure",
+        "je ne suis pas capable",
+        "je ne suis pas sûr",
+        "ne contiennent pas",
+        "pas de liste exhaustive",
+        "insuffisant",
+        "insuffisantes",
     ]
 
     answer_lower = answer.lower()
@@ -245,5 +259,45 @@ def run_ragas(
             "n_refusal_ko": 0,
         }
 
+
+    if "route_used" in final_df.columns:
+        route_counts = final_df["route_used"].value_counts(dropna=False).to_dict()
+        total_routes = int(len(final_df))
+
+        summary["routing"] = {
+            str(k): int(v) for k, v in route_counts.items()
+        }
+
+        summary["routing_ratio"] = {
+            str(k): round(v / total_routes, 4) if total_routes > 0 else 0.0
+            for k, v in route_counts.items()
+        }
+    else:
+        summary["routing"] = {}
+        summary["routing_ratio"] = {}
+
+    if "route_used" in final_df.columns and "sql_success" in final_df.columns:
+        sql_mask = final_df["route_used"] == "SQL"
+        n_sql_calls = int(sql_mask.sum())
+
+        if n_sql_calls > 0:
+            n_sql_success = int(final_df.loc[sql_mask, "sql_success"].fillna(False).sum())
+            sql_success_rate = n_sql_success / n_sql_calls
+        else:
+            n_sql_success = 0
+            sql_success_rate = 0.0
+
+        summary["sql"] = {
+            "n_calls": n_sql_calls,
+            "n_success": n_sql_success,
+            "success_rate": round(sql_success_rate, 4),
+        }
+    else:
+        summary["sql"] = {
+            "n_calls": 0,
+            "n_success": 0,
+            "success_rate": 0.0,
+        }
+        
     logging.info("Évaluation RAGAS terminée.")
     return final_df, summary

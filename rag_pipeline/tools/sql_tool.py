@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import List, Dict, Any
 
 from sqlalchemy import create_engine, text
 
-from rag_pipeline.config import MODEL_NAME,DATABASE_URL_LLM
+from rag_pipeline.config import MODEL_NAME,DATABASE_URL_LLM,SQL_GENERATION_PROMPT_TEMPLATE
 from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
@@ -32,17 +31,29 @@ def validate_sql_query(query: str) -> str:
     """Valide et sécurise une requête SQL."""
     q = query.strip()
 
-    # Autoriser uniquement SELECT
-    if not q.upper().startswith("SELECT"):
-        raise ValueError("Seules les requêtes SELECT sont autorisées")
+    if not q:
+        raise ValueError("Requête SQL vide")
+
+    # Autoriser uniquement SELECT ou WITH
+    if not (q.upper().startswith("SELECT") or q.upper().startswith("WITH")):
+        raise ValueError("Seules les requêtes SELECT ou WITH sont autorisées")
+
+    # Bloquer commentaires SQL
+    if "--" in q or "/*" in q or "*/" in q:
+        raise ValueError("Commentaires SQL non autorisés")
 
     # Bloquer mots dangereux
     if any(word in q.upper() for word in FORBIDDEN):
         raise ValueError("Requête SQL non autorisée")
 
+    # Éviter plusieurs requêtes séparées par ;
+    q_no_trailing = q.rstrip(";").strip()
+    if ";" in q_no_trailing:
+        raise ValueError("Une seule requête SQL est autorisée")
+
     # Ajouter LIMIT si absent
     if "LIMIT" not in q.upper():
-        q += " LIMIT 50"
+        q = q.rstrip(";") + " LIMIT 50"
 
     return q
 
@@ -116,6 +127,12 @@ reports
 - related_team_codes : liste des équipes détectées (séparées par des virgules)
 - related_player_names : liste des joueurs détectés (séparés par des virgules)
 
+Important pour reports :
+- Pour compter les joueurs les plus mentionnés dans les documents textuels, utiliser la colonne related_player_names.
+- related_player_names doit être découpé avec string_to_array(related_player_names, ',') puis unnest.
+- Toujours nettoyer les noms avec TRIM avant agrégation.
+- Pour ce type de question, ne pas analyser report_text directement si related_player_names suffit.
+
 Relations :
 - players.team_code = teams.team_code
 - stats.player_id = players.player_id
@@ -175,6 +192,90 @@ ORDER BY pts_ast DESC
 LIMIT 5;
 """.strip(),
     },
+    {
+    "question": "Quelle est la différence de performance entre les joueurs les plus scoreurs et les meilleurs passeurs ?",
+    "sql": """
+WITH top_scorer AS (
+    SELECT
+        p.player_name,
+        s.pts,
+        s.ast,
+        s.reb,
+        s.fg_pct,
+        s.fg3_pct,
+        s.offrtg
+    FROM stats s
+    JOIN players p ON s.player_id = p.player_id
+    ORDER BY s.pts DESC
+    LIMIT 1
+),
+top_passer AS (
+    SELECT
+        p.player_name,
+        s.pts,
+        s.ast,
+        s.reb,
+        s.fg_pct,
+        s.fg3_pct,
+        s.offrtg
+    FROM stats s
+    JOIN players p ON s.player_id = p.player_id
+    ORDER BY s.ast DESC
+    LIMIT 1
+)
+SELECT
+    ts.player_name AS top_scorer_name,
+    ts.pts AS top_scorer_pts,
+    ts.ast AS top_scorer_ast,
+    ts.reb AS top_scorer_reb,
+    ts.fg_pct AS top_scorer_fg_pct,
+    ts.fg3_pct AS top_scorer_fg3_pct,
+    ts.offrtg AS top_scorer_offrtg,
+    tp.player_name AS top_passer_name,
+    tp.pts AS top_passer_pts,
+    tp.ast AS top_passer_ast,
+    tp.reb AS top_passer_reb,
+    tp.fg_pct AS top_passer_fg_pct,
+    tp.fg3_pct AS top_passer_fg3_pct,
+    tp.offrtg AS top_passer_offrtg
+FROM top_scorer ts
+CROSS JOIN top_passer tp
+LIMIT 1;
+""".strip(),
+},
+{
+    "question": "Quel joueur est le plus complet entre points, rebonds et passes ?",
+    "sql": """
+SELECT
+    p.player_name,
+    s.pts,
+    s.reb,
+    s.ast,
+    (s.pts + s.reb + s.ast) AS total_contribution
+FROM stats s
+JOIN players p ON s.player_id = p.player_id
+ORDER BY total_contribution DESC
+LIMIT 1;
+""".strip(),
+},
+{
+    "question": "Quels joueurs sont les plus mentionnés dans les discussions Reddit ?",
+    "sql": """
+SELECT
+    player_name,
+    COUNT(*) AS mention_count
+FROM (
+    SELECT
+        TRIM(unnest(string_to_array(related_player_names, ','))) AS player_name
+    FROM reports
+    WHERE related_player_names IS NOT NULL
+) AS extracted
+WHERE player_name <> ''
+GROUP BY player_name
+ORDER BY mention_count DESC, player_name ASC
+LIMIT 10;
+""".strip(),
+},
 ]
 
 
@@ -195,34 +296,15 @@ def build_sql_prompt(question: str) -> str:
         for ex in FEW_SHOTS
     )
 
-    return f"""
-        Tu es un assistant expert en SQL PostgreSQL.
-
-        Ta tâche est de générer une requête SQL valide à partir d'une question utilisateur.
-
-        {SCHEMA_CONTEXT}
-
-        Exemples :
-        {examples}
-
-        Contraintes :
-        - Génère uniquement du SQL
-        - Utilise uniquement SELECT
-        - N'utilise jamais INSERT, UPDATE, DELETE, DROP, ALTER, CREATE ou TRUNCATE
-        - N'utilise jamais SELECT *
-        - Utilise des JOIN explicites si nécessaire
-        - Ajoute toujours LIMIT si la requête peut retourner plusieurs lignes
-        - Utilise uniquement les tables et colonnes décrites dans le schéma
-
-        Question utilisateur :
-        {question}
-
-        SQL :
-        """.strip()
+    return SQL_GENERATION_PROMPT_TEMPLATE.format(
+        schema_context=SCHEMA_CONTEXT,
+        examples=examples,
+        question=question,
+    )
 
 
 def clean_llm_sql_output(text: str) -> str:
-    """Nettoie la sortie du LLM pour ne garder que le SQL."""
+    """Nettoie la sortie du LLM pour ne garder que la requête SQL."""
     text = text.strip()
     text = text.replace("```sql", "").replace("```", "").strip()
 
@@ -231,20 +313,25 @@ def clean_llm_sql_output(text: str) -> str:
     started = False
 
     for line in lines:
-        if line.strip().upper().startswith("SELECT"):
+        stripped = line.strip()
+        upper = stripped.upper()
+
+        if upper.startswith("WITH") or upper.startswith("SELECT"):
             started = True
+
         if started:
             sql_lines.append(line)
 
-    return "\n".join(sql_lines).strip()
+    cleaned = "\n".join(sql_lines).strip()
 
+    # Si le LLM a ajouté du texte après la requête, on coupe au dernier ;
+    if ";" in cleaned:
+        cleaned = cleaned[: cleaned.rfind(";") + 1]
 
-# =========================================================
-# Tool principal
-# =========================================================
+    return cleaned.strip()
 
-def sql_tool(question: str) -> List[Dict[str, Any]]:
-    """Pipeline complet : question → SQL → résultats"""
+def sql_tool_with_metadata(question: str) -> Dict[str, Any]:
+    """Pipeline complet : question → SQL → résultats + métadonnées."""
     logger.info("Question reçue: %s", question)
 
     sql_query = generate_sql_query(question)
@@ -252,28 +339,32 @@ def sql_tool(question: str) -> List[Dict[str, Any]]:
 
     results = run_sql_query(sql_query)
 
-    return results
+    return {
+        "question": question,
+        "sql_query": sql_query,
+        "rows": results,
+        "n_rows": len(results),
+    }
 
-if __name__ == "__main__":
-    from utils.logging_config import setup_logging
 
-    setup_logging()
+def sql_rows_to_context(question: str, rows: List[Dict[str, Any]]) -> str:
+    """Transforme les résultats SQL en pseudo-contexte textuel pour analyse."""
+    if not rows:
+        return f"Aucun résultat SQL trouvé pour la question : {question}"
 
-    questions = [
-        "Qui sont les 5 meilleurs scoreurs ?",
-        "Quelles sont les 5 équipes avec la meilleure moyenne de points ?",
-        "Quels sont les joueurs des Los Angeles Lakers avec le plus de points ?",
-        "Quels joueurs combinent le plus de points et de passes ?",
-        "Quelles équipes sont les plus mentionnées dans les reports ?"
-    ]
+    lines = [f"Résultats SQL pour la question : {question}"]
 
-    for q in questions:
-        print("\n" + "="*50)
-        print(f"Question: {q}")
+    for i, row in enumerate(rows, start=1):
+        parts = [f"{k}={v}" for k, v in row.items()]
+        lines.append(f"Ligne {i} : " + ", ".join(parts))
 
-        try:
-            result = sql_tool(q)
-            print("Résultat:")
-            print(result)
-        except Exception as e:
-            print("Erreur:", e)
+    return "\n".join(lines)
+
+# =========================================================
+# Tool principal
+# =========================================================
+
+def sql_tool(question: str) -> List[Dict[str, Any]]:
+    """Pipeline complet : question → SQL → résultats."""
+    payload = sql_tool_with_metadata(question)
+    return payload["rows"]

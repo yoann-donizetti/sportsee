@@ -45,3 +45,5 @@ vector_db/
 
 # Jupyter
 .ipynb_checkpoints/
+
+evaluate/results/v1_1_sql_routing

@@ -1,0 +1,58 @@
+{
+  "n_questions_total": 15,
+  "n_answerable_true": 12,
+  "n_answerable_false": 3,
+  "metric_columns": [
+    "faithfulness",
+    "answer_relevancy",
+    "context_precision",
+    "context_recall"
+  ],
+  "global_means": {
+    "faithfulness": 0.44383417508417516,
+    "answer_relevancy": 0.726493117167204,
+    "context_precision": 0.18055555554097222,
+    "context_recall": 0.3611111111111111
+  },
+  "by_category_answerable_true": {
+    "comparaison": {
+      "faithfulness": 0.0955,
+      "answer_relevancy": 0.8213,
+      "context_precision": 0.25,
+      "context_recall": 0.6667
+    },
+    "factuel_complexe": {
+      "faithfulness": 0.2917,
+      "answer_relevancy": 0.9118,
+      "context_precision": 0.1667,
+      "context_recall": 0.0
+    },
+    "factuel_simple": {
+      "faithfulness": 0.5301,
+      "answer_relevancy": 0.5895,
+      "context_precision": 0.2222,
+      "context_recall": 0.5
+    },
+    "subjectif": {
+      "faithfulness": 0.6856,
+      "answer_relevancy": 0.8574,
+      "context_precision": 0.0,
+      "context_recall": 0.0
+    }
+  },
+  "answerable_true": {
+    "n_questions": 12,
+    "means": {
+      "faithfulness": 0.44383417508417516,
+      "answer_relevancy": 0.726493117167204,
+      "context_precision": 0.18055555554097222,
+      "context_recall": 0.3611111111111111
+    }
+  },
+  "answerable_false": {
+    "n_questions": 3,
+    "refusal_rate": 0.0,
+    "n_refusal_ok": 0,
+    "n_refusal_ko": 3
+  }
+}
