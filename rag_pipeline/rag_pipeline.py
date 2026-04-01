@@ -44,9 +44,11 @@ from rag_pipeline.router import (
     is_sql_question,
     is_unsupported_question,
     is_noisy_question,
+    is_subjective_question,
+    build_refusal_answer,
 )
 from rag_pipeline.tools.sql_tool import sql_tool
-from rag_pipeline.llm_utils import ask_mistral,build_refusal_answer
+from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +184,7 @@ def poser_question(
     logfire.info("Question utilisateur", question=prompt)
 
     # =========================================================
-    # Questions non supportées
+    # Questions à refuser
     # =========================================================
     if is_unsupported_question(prompt):
         logger.info("Question non supportée détectée : %s", prompt)
@@ -200,9 +202,6 @@ def poser_question(
         logger.info("Route choisie : REFUS_UNSUPPORTED")
         return result.model_dump()
 
-    # =========================================================
-    # Questions bruitées / trop imprécises
-    # =========================================================
     if is_noisy_question(prompt):
         logger.info("Question bruitée détectée : %s", prompt)
 
@@ -217,6 +216,22 @@ def poser_question(
             sql_success=False,
         )
         logger.info("Route choisie : REFUS_NOISY")
+        return result.model_dump()
+
+    if is_subjective_question(prompt):
+        logger.info("Question subjective détectée : %s", prompt)
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=build_refusal_answer(prompt),
+            search_results=[],
+            context_str="",
+            final_prompt_for_llm="",
+            messages_for_api=[],
+            route_used="REFUS",
+            sql_success=False,
+        )
+        logger.info("Route choisie : REFUS_SUBJECTIVE")
         return result.model_dump()
 
     # =========================================================

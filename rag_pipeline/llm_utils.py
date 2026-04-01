@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from mistralai.client import MistralClient
 
-from rag_pipeline.config import MISTRAL_API_KEY, MODEL_NAME,REFUSAL_MESSAGE
+from rag_pipeline.config import MISTRAL_API_KEY, MODEL_NAME
 
 
 client = MistralClient(api_key=MISTRAL_API_KEY)
@@ -28,26 +28,3 @@ def ask_mistral(
     return response.choices[0].message.content.strip()
 
 
-
-
-def build_refusal_answer(question: str) -> str:
-    q = question.lower()
-
-    # Cas temporel
-    if any(x in q for x in ["dernier", "match", "5 matchs", "last", "recent"]):
-        return (
-            "Je ne dispose pas de données temporelles (par match ou sur une période). "
-            "Les données disponibles correspondent à une saison globale."
-        )
-
-    # Cas domicile / extérieur
-    if any(x in q for x in ["domicile", "extérieur", "home", "away"]):
-        return (
-            "Je ne dispose pas de données séparées domicile/extérieur dans les informations disponibles."
-        )
-
-    # Cas question trop vague / bruitée
-    if len(q.split()) < 5:
-        return "Je ne peux pas répondre car la question est trop imprécise."
-
-    return REFUSAL_MESSAGE

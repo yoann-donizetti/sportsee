@@ -215,7 +215,18 @@ NO_RAG_CONTEXT_MESSAGE = (
     "Aucune information pertinente trouvée dans la base de connaissances pour cette question."
 )
 
-REFUSAL_MESSAGE = (
-    "Je ne peux pas répondre de manière fiable à cette question avec les données actuellement "
-    "disponibles."
-)
+REFUSAL_MESSAGES = {
+    "unsupported": (
+        "Je ne dispose pas des données nécessaires pour répondre à cette question. "
+        "Les informations disponibles concernent des statistiques globales sur la saison, "
+        "sans détail temporel ou contextuel (domicile/extérieur, derniers matchs, etc.)."
+    ),
+    "subjective": (
+        "Cette question repose sur des éléments subjectifs ou des opinions (fans, popularité, discussions), "
+        "qui ne sont pas présents dans les données disponibles."
+    ),
+    "noisy": (
+        "Je ne peux pas répondre de manière fiable à cette question car elle est trop vague ou imprécise. "
+        "Pouvez-vous préciser les joueurs ou les statistiques concernées ?"
+    ),
+}

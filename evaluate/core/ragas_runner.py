@@ -91,6 +91,10 @@ Returns:
         "je ne suis pas en mesure",
         "je ne suis pas capable",
         "je ne suis pas sûr",
+        "ne contiennent pas",
+        "pas de liste exhaustive",
+        "insuffisant",
+        "insuffisantes",
     ]
 
     answer_lower = answer.lower()
