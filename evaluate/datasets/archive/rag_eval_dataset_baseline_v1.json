@@ -9,7 +9,7 @@
   {
     "id": 2,
     "question": "Quelle équipe a marqué le plus de points au total ?",
-    "ground_truth": "L'équipe avec le plus de points est Detroit Pistons.",
+    "ground_truth": "L'équipe avec le plus de points est Oklahoma City Thunder.",
     "category": "factuel_simple",
     "answerable": true
   },
@@ -58,7 +58,7 @@
   {
     "id": 9,
     "question": "Quel joueur a le meilleur pourcentage à 3 points sur la saison ?",
-    "ground_truth": "Alondes Williams (100%)",
+    "ground_truth": "Seth Curry (CHA) avec 45,6 % à 3 points.",
     "category": "factuel_simple",
     "answerable": true
   },
