@@ -17,6 +17,16 @@ L’objectif est d’évaluer l’impact de cette évolution sur :
 - la **pertinence des réponses générées**.
 
 ---
+## Vérification et correction du dataset d’évaluation
+
+Lors de l’analyse détaillée des résultats, une vérification manuelle avec les données sources a permis d’identifier plusieurs incohérences dans le dataset d’évaluation initial, notamment sur certaines vérités terrain.
+
+Ces incohérences pouvaient produire des faux négatifs et biaiser l’évaluation du système.
+
+Une vérification manuelle systématique a donc été réalisée en comparant les réponses attendues avec les données sources.
+
+Le dataset a ensuite été corrigé, puis l’évaluation RAGAS relancée afin d’obtenir une baseline fiable et exploitable.
+
 
 ## Limites identifiées sur la baseline
 
@@ -36,7 +46,7 @@ L’intégration du SQL Tool permet désormais :
 - d’interroger une base de données structurée ;
 - de générer dynamiquement des requêtes SQL à partir du langage naturel ;
 - d’exécuter ces requêtes en lecture seule ;
-- de reformuler les արդյունats en langage naturel via le LLM.
+- de reformuler les résultats en langage naturel via le LLM.
 
 Cette évolution marque le passage vers une **architecture hybride RAG + SQL**.
 
@@ -86,10 +96,10 @@ Des indicateurs métier complètent l’analyse :
 
 | Indicateur | Score |
 |------------|-------|
-| Faithfulness | 0.53 |
-| Answer Relevancy | 0.79 |
-| Context Precision | 0.30 |
-| Context Recall | 0.49 |
+| Faithfulness | 0.44 |
+| Answer Relevancy | 0.73 |
+| Context Precision | 0.18 |
+| Context Recall | 0.36 |
 | Refusal Rate | 0.00 |
 
 📎 Résultats détaillés :  
@@ -102,41 +112,43 @@ Des indicateurs métier complètent l’analyse :
 
 | Indicateur | Score |
 |------------|-------|
-| Faithfulness | 0.03 |
-| Answer Relevancy | 0.84 |
+| Faithfulness | 0.07 |
+| Answer Relevancy | 0.86 |
 | Context Precision | 0.04 |
-| Context Recall | 0.08 |
+| Context Recall | 0.00 |
 | Refusal Rate | 0.00 |
 
-📎 Résultats détaillés :  
-- [CSV version SQL](evaluate/results/sql/ragas_results.csv)  
-- [Résumé version SQL](evaluate/results/sql/ragas_summary.json)
-
+Résultats détaillés :  
+- [CSV version SQL](../evaluate/results/v1_1_sql_corrigé/ragas_results.csv)  
+- [Résumé version SQL](../evaluate/results/v1_1_sql_corrigé/ragas_summary.json) 
 ---
 
 ## Analyse comparative des performances
 
+
+
 ### Comparaison des métriques RAGAS
 
-| Indicateur            | Baseline (RAG seul) | Version 1.1 (RAG + SQL) | Évolution        | Interprétation |
-|----------------------|--------------------|--------------------------|------------------|----------------|
-| Faithfulness         | 0.53               | 0.03                     | Forte baisse     | Métrique inadaptée aux réponses SQL |
-| Answer Relevancy     | 0.79               | 0.84                     | Légère hausse    | Meilleure adéquation globale |
-| Context Precision    | 0.30               | 0.04                     | Forte baisse     | SQL non pris en compte |
-| Context Recall       | 0.49               | 0.08                     | Forte baisse     | Même limite |
-| Refusal Rate         | 0.00               | 0.00                     | Stable           | Refus toujours absent |
-
+| Indicateur            | Baseline corrigée | Version SQL corrigée | Évolution        | Interprétation |
+|----------------------|------------------|----------------------|------------------|----------------|
+| Faithfulness         | 0.44             | 0.07                 | Forte baisse     | RAGAS pénalise les réponses issues du SQL, car elles ne reposent plus sur un contexte textuel classique |
+| Answer Relevancy     | 0.73             | 0.86                 | Hausse nette     | Les réponses sont globalement plus adaptées aux questions |
+| Context Precision    | 0.18             | 0.04                 | Baisse           | Les contextes FAISS ne sont plus centraux dans les réponses SQL |
+| Context Recall       | 0.36             | 0.00                 | Forte baisse     | Même limite méthodologique : les réponses SQL ne s’appuient pas sur les chunks textuels |
+| Refusal Rate         | 0.00             | 0.00                 | Stable           | À ce stade, la gestion du refus n’est pas encore améliorée |
 ---
+
+
 
 ### Analyse métier
 
 | Critère métier                  | Baseline | RAG + SQL | Observation |
-|--------------------------------|----------|----------|------------|
-| Questions factuelles correctes  | Moyen    | Élevé    | Forte amélioration |
-| Hallucinations numériques       | Fréquentes | Réduites | Données fiables |
-| Questions unsupported           | Mal gérées | Mal gérées | Refus absent |
-| Questions bruitées              | Hallucinations | Hallucinations | Problème persistant |
-| Questions comparatives          | Variable | Variable | Cas complexe |
+|--------------------------------|----------|-----------|------------|
+| Questions factuelles correctes  | Moyen    | Élevé     | Forte amélioration sur les questions chiffrées |
+| Hallucinations numériques       | Fréquentes | Réduites | Le SQL améliore la fiabilité des réponses statistiques |
+| Questions unsupported           | Mal gérées | Mal gérées | Le refus n’est pas encore pris en charge dans cette version |
+| Questions bruitées              | Hallucinations | Hallucinations | Pas d’amélioration notable à ce stade |
+| Questions comparatives          | Variable | Variable | Certaines comparaisons restent fragiles ou incomplètes |
 
 ---
 
@@ -144,23 +156,42 @@ Des indicateurs métier complètent l’analyse :
 
 ### Dégradation apparente des scores
 
-Les métriques RAGAS montrent une baisse importante :
+Les métriques RAGAS montrent une baisse importante sur certaines dimensions :
 
-- Faithfulness : 0.53 → 0.03  
-- Context Precision : 0.30 → 0.04  
-- Context Recall : 0.49 → 0.08  
+- Faithfulness : 0.44 → 0.07  
+- Context Precision : 0.18 → 0.04  
+- Context Recall : 0.36 → 0.00  
+
+En revanche, la pertinence des réponses progresse :
+
+- Answer Relevancy : 0.73 → 0.86 
+
+Une baisse des métriques RAGAS ne signifie pas nécessairement une dégradation du système.
+
+Dans ce cas précis :
+
+- les performances métier s’améliorent
+- mais les métriques ne capturent pas correctement le fonctionnement hybride
+
+Il est donc nécessaire de croiser :
+
+- métriques automatiques
+- validation métier
 
 ---
 
 ### Explication
 
-Cette baisse est **méthodologique**, pas fonctionnelle :
+Cette baisse n’indique pas nécessairement une dégradation fonctionnelle du système.
 
-- RAGAS suppose un contexte textuel (FAISS)
-- SQL fournit des données structurées
+Elle s’explique en grande partie par une limite méthodologique de RAGAS dans le cadre d’une architecture hybride :
 
-donc :
-- réponse correcte ≠ bonne note RAGAS
+- la baseline repose sur des contextes textuels issus du retrieval FAISS ;
+- la version enrichie produit une partie de ses réponses à partir de données SQL structurées.
+
+Or, les métriques comme la faithfulness, la context precision et la context recall évaluent la relation entre la réponse et un contexte textuel.
+
+Ainsi, une réponse correcte issue du SQL peut obtenir un score faible, simplement parce qu’elle n’est pas reliée aux chunks textuels récupérés.
 
 ---
 
@@ -187,11 +218,13 @@ les métriques doivent évoluer aussi
 
 ### Limites restantes
 
-- mapping NL → SQL imparfait  
-- absence de refus  
-- gestion insuffisante des unsupported  
-- cas hybrides encore fragiles  
+Malgré l’amélioration observée sur les questions chiffrées, plusieurs limites subsistent :
 
+- absence de mécanisme de refus dans cette version ;
+- questions unsupported encore mal gérées ;
+- questions bruitées toujours sujettes à hallucination ;
+- comparaisons complexes encore fragiles ;
+- dépendance à la qualité du mapping langage naturel → SQL.
 ---
 
 ## Limites de l’évaluation
@@ -225,3 +258,26 @@ Transformer le SQL en contexte textuel :
 
 ```text
 Question → SQL → résultat → texte → RAGAS
+```
+
+## Conclusion comparative
+
+L’intégration du SQL Tool constitue une amélioration importante du système sur les questions chiffrées et statistiques.
+
+Les principaux gains observés sont :
+
+- une meilleure pertinence globale des réponses ;
+- une réduction des hallucinations numériques sur plusieurs cas factuels ;
+- une meilleure adéquation du système aux besoins métier portant sur les données structurées.
+
+En revanche, cette version ne résout pas encore :
+
+- la gestion du refus ;
+- les questions hors périmètre ;
+- certaines comparaisons complexes ;
+- la limite méthodologique de RAGAS pour évaluer un système hybride.
+
+La version enrichie ne doit donc pas être jugée uniquement à travers les métriques RAGAS classiques.  
+Elle marque surtout une progression vers un système plus fiable sur les questions quantitatives, tout en montrant la nécessité d’adapter aussi le protocole d’évaluation.
+
+Le système évolue ainsi d’un modèle principalement génératif vers un système orienté données, plus fiable sur les questions quantitatives.
