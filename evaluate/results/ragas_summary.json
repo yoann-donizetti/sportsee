@@ -9,33 +9,33 @@
     "context_recall"
   ],
   "global_means": {
-    "faithfulness": 0.09090909090909091,
-    "answer_relevancy": 0.7678837619979851,
+    "faithfulness": 0.18181818181818182,
+    "answer_relevancy": 0.7766438336507261,
     "context_precision": 0.0416666666625,
-    "context_recall": 0.0
+    "context_recall": 0.041666666666666664
   },
   "by_category_answerable_true": {
     "comparaison": {
       "faithfulness": 0.5,
-      "answer_relevancy": 0.3722,
+      "answer_relevancy": 0.4501,
       "context_precision": 0.25,
-      "context_recall": 0.0
+      "context_recall": 0.25
     },
     "factuel_complexe": {
       "faithfulness": 0.0,
-      "answer_relevancy": 0.9496,
+      "answer_relevancy": 0.9227,
       "context_precision": 0.0,
       "context_recall": 0.0
     },
     "factuel_simple": {
-      "faithfulness": 0.0,
-      "answer_relevancy": 0.9331,
+      "faithfulness": 0.1667,
+      "answer_relevancy": 0.9358,
       "context_precision": 0.0,
       "context_recall": 0.0
     },
     "subjectif": {
       "faithfulness": 0.0,
-      "answer_relevancy": 0.4861,
+      "answer_relevancy": 0.4797,
       "context_precision": 0.0,
       "context_recall": 0.0
     }
@@ -43,10 +43,10 @@
   "answerable_true": {
     "n_questions": 12,
     "means": {
-      "faithfulness": 0.09090909090909091,
-      "answer_relevancy": 0.7678837619979851,
+      "faithfulness": 0.18181818181818182,
+      "answer_relevancy": 0.7766438336507261,
       "context_precision": 0.0416666666625,
-      "context_recall": 0.0
+      "context_recall": 0.041666666666666664
     }
   },
   "answerable_false": {
@@ -54,5 +54,20 @@
     "refusal_rate": 1.0,
     "n_refusal_ok": 3,
     "n_refusal_ko": 0
+  },
+  "routing": {
+    "SQL": 10,
+    "REFUS": 3,
+    "RAG": 2
+  },
+  "routing_ratio": {
+    "SQL": 0.6667,
+    "REFUS": 0.2,
+    "RAG": 0.1333
+  },
+  "sql": {
+    "n_calls": 10,
+    "n_success": 10,
+    "success_rate": 1.0
   }
 }
