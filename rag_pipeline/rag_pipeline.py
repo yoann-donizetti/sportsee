@@ -194,6 +194,8 @@ def poser_question(
             context_str="",
             final_prompt_for_llm="",
             messages_for_api=[],
+            route_used="REFUS",
+            sql_success=False,
         )
         logger.info("Route choisie : REFUS_UNSUPPORTED")
         return result.model_dump()
@@ -211,6 +213,8 @@ def poser_question(
             context_str="",
             final_prompt_for_llm="",
             messages_for_api=[],
+            route_used="REFUS",
+            sql_success=False,
         )
         logger.info("Route choisie : REFUS_NOISY")
         return result.model_dump()
@@ -232,6 +236,8 @@ def poser_question(
                 context_str="",
                 final_prompt_for_llm="",
                 messages_for_api=[],
+                route_used="SQL",
+                sql_success=True,
             )
             logger.info("Route choisie : SQL")
             return result.model_dump()
@@ -249,6 +255,8 @@ def poser_question(
                 context_str="",
                 final_prompt_for_llm="",
                 messages_for_api=[],
+                route_used="SQL",
+                sql_success=False,
             )
             return result.model_dump()
 
@@ -268,6 +276,8 @@ def poser_question(
             context_str="",
             final_prompt_for_llm="",
             messages_for_api=[],
+            route_used="RAG",
+            sql_success=False,
         )
         return result.model_dump()
 
@@ -332,6 +342,8 @@ def poser_question(
             {"role": msg.role, "content": msg.content}
             for msg in messages_for_api
         ],
+        route_used="RAG",
+        sql_success=False,
     )
 
     return result.model_dump()

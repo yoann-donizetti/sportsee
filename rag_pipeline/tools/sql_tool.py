@@ -32,9 +32,9 @@ def validate_sql_query(query: str) -> str:
     """Valide et sécurise une requête SQL."""
     q = query.strip()
 
-    # Autoriser uniquement SELECT
-    if not q.upper().startswith("SELECT"):
-        raise ValueError("Seules les requêtes SELECT sont autorisées")
+    # Autoriser uniquement SELECT ou WITH
+    if not (q.upper().startswith("SELECT") or q.upper().startswith("WITH")):
+        raise ValueError("Seules les requêtes SELECT ou WITH sont autorisées")
 
     # Bloquer mots dangereux
     if any(word in q.upper() for word in FORBIDDEN):
@@ -175,6 +175,57 @@ ORDER BY pts_ast DESC
 LIMIT 5;
 """.strip(),
     },
+    {
+    "question": "Quelle est la différence de performance entre les joueurs les plus scoreurs et les meilleurs passeurs ?",
+    "sql": """
+WITH top_scorer AS (
+    SELECT
+        p.player_name,
+        s.pts,
+        s.ast,
+        s.reb,
+        s.fg_pct,
+        s.fg3_pct,
+        s.offrtg
+    FROM stats s
+    JOIN players p ON s.player_id = p.player_id
+    ORDER BY s.pts DESC
+    LIMIT 1
+),
+top_passer AS (
+    SELECT
+        p.player_name,
+        s.pts,
+        s.ast,
+        s.reb,
+        s.fg_pct,
+        s.fg3_pct,
+        s.offrtg
+    FROM stats s
+    JOIN players p ON s.player_id = p.player_id
+    ORDER BY s.ast DESC
+    LIMIT 1
+)
+SELECT
+    ts.player_name AS top_scorer_name,
+    ts.pts AS top_scorer_pts,
+    ts.ast AS top_scorer_ast,
+    ts.reb AS top_scorer_reb,
+    ts.fg_pct AS top_scorer_fg_pct,
+    ts.fg3_pct AS top_scorer_fg3_pct,
+    ts.offrtg AS top_scorer_offrtg,
+    tp.player_name AS top_passer_name,
+    tp.pts AS top_passer_pts,
+    tp.ast AS top_passer_ast,
+    tp.reb AS top_passer_reb,
+    tp.fg_pct AS top_passer_fg_pct,
+    tp.fg3_pct AS top_passer_fg3_pct,
+    tp.offrtg AS top_passer_offrtg
+FROM top_scorer ts
+CROSS JOIN top_passer tp
+LIMIT 1;
+""".strip(),
+},
 ]
 
 
@@ -213,7 +264,9 @@ def build_sql_prompt(question: str) -> str:
         - Utilise des JOIN explicites si nécessaire
         - Ajoute toujours LIMIT si la requête peut retourner plusieurs lignes
         - Utilise uniquement les tables et colonnes décrites dans le schéma
-
+        - Si la question demande une comparaison entre deux profils extrêmes (ex: meilleur scoreur vs meilleur passeur), identifie d'abord chaque joueur avec une sous-requête ou un CTE.
+        - Si la question est trop ambiguë pour produire une requête fiable, retourne une requête SQL simple de comparaison entre les leaders concernés.
+        - N'invente jamais de colonnes qui ne figurent pas dans le schéma.
         Question utilisateur :
         {question}
 
@@ -222,7 +275,6 @@ def build_sql_prompt(question: str) -> str:
 
 
 def clean_llm_sql_output(text: str) -> str:
-    """Nettoie la sortie du LLM pour ne garder que le SQL."""
     text = text.strip()
     text = text.replace("```sql", "").replace("```", "").strip()
 
@@ -231,8 +283,11 @@ def clean_llm_sql_output(text: str) -> str:
     started = False
 
     for line in lines:
-        if line.strip().upper().startswith("SELECT"):
+        l = line.strip().upper()
+
+        if l.startswith("WITH") or l.startswith("SELECT"):
             started = True
+
         if started:
             sql_lines.append(line)
 

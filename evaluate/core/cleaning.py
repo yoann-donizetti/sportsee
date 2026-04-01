@@ -34,6 +34,8 @@ def clean_results_for_analysis(results_df: pd.DataFrame) -> pd.DataFrame:
         "question",
         "ground_truth",
         "answer",
+        "route_used",
+        "sql_success",
         "faithfulness",
         "answer_relevancy",
         "context_precision",

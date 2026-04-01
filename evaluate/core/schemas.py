@@ -47,3 +47,5 @@ class RagPipelineOutput(BaseModel):
     context_str: str
     final_prompt_for_llm: str
     messages_for_api: List[dict]
+    route_used: str = ""
+    sql_success: bool = False

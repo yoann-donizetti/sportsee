@@ -67,6 +67,8 @@ def build_ragas_rows(samples: list[Any], search_k: int) -> list[dict[str, Any]]:
                 "answer": result["answer"],
                 "contexts": retrieved_contexts,
                 "nb_contexts": len(retrieved_contexts),
+                "route_used": result.get("route_used", "UNKNOWN"),
+                "sql_success": result.get("sql_success", False),
             }
         )
 
