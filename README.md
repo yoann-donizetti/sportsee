@@ -1,4 +1,35 @@
+![CI](https://github.com/yoann-donizetti/sportsee/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.10-blue)
+![Tests](https://img.shields.io/badge/tests-pytest-green)
+![Vector Search](https://img.shields.io/badge/vector%20search-FAISS-purple)
+![RAG](https://img.shields.io/badge/RAG-LangChain-orange)
+![LLM](https://img.shields.io/badge/LLM-Mistral-red)
+![API](https://img.shields.io/badge/API-FastAPI-009688)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+
+
 # NBA Analyst AI — Assistant RAG avec Mistral
+
+## Table des matières
+
+- [Fonctionnalités](#fonctionnalités)
+- [Architecture du système](#architecture-du-système)
+- [API REST](#api-rest)
+- [Base de données (PostgreSQL)](#-base-de-données-postgresql)
+- [SQL Tool (questions chiffrées et agrégations structurées)](#sql-tool-questions-chiffrées-et-agrégations-structurées)
+- [Routing des requêtes](#routing-des-requêtes)
+- [Exemples de questions](#exemples-de-questions)
+- [Résultats d’évaluation](#résultats-dévaluation)
+- [Structure du projet](#-structure-du-projet)
+- [Modules principaux](#modules-principaux)
+- [Paramétrage](#paramétrage)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Exécution du projet](#exécution-du-projet)
+- [Dataset d’évaluation](#dataset-dévaluation)
+- [Limites actuelles](#limites-actuelles)
+- [Améliorations prévues](#améliorations-prévues)
+- [Objectif](#objectif)
 
 Ce projet implémente un assistant IA hybride pour répondre à des questions sur des données NBA, en combinant :
 
@@ -14,6 +45,10 @@ L’objectif est de construire un système capable de :
 - être évalué de manière rigoureuse avec **RAGAS** et des indicateurs métier.
 
 ---
+
+## Table des matières
+
+
 
 ## Fonctionnalités
 
