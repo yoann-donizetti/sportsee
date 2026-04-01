@@ -47,7 +47,7 @@ from rag_pipeline.router import (
     is_subjective_question,
     build_refusal_answer,
 )
-from rag_pipeline.tools.sql_tool import sql_tool
+from rag_pipeline.tools.sql_tool import sql_tool,sql_tool_with_metadata, sql_rows_to_context
 from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
@@ -241,19 +241,25 @@ def poser_question(
         logger.info("Question détectée comme SQL : %s", prompt)
 
         try:
-            sql_results = sql_tool(prompt)
+            payload = sql_tool_with_metadata(prompt)
+
+            sql_results = payload["rows"]
+            sql_query = payload["sql_query"]
+
             sql_answer = synthesize_sql_answer(prompt, sql_results)
+            sql_context = sql_rows_to_context(prompt, sql_results)
 
             result = RagPipelineOutput(
                 question=prompt,
                 answer=sql_answer,
                 search_results=[],
-                context_str="",
-                final_prompt_for_llm="",
+                context_str=sql_context,
+                final_prompt_for_llm=sql_query,
                 messages_for_api=[],
                 route_used="SQL",
                 sql_success=True,
             )
+
             logger.info("Route choisie : SQL")
             return result.model_dump()
 
@@ -273,6 +279,7 @@ def poser_question(
                 route_used="SQL",
                 sql_success=False,
             )
+
             return result.model_dump()
 
     # =========================================================

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import List, Dict, Any
 
 from sqlalchemy import create_engine, text
@@ -32,17 +31,29 @@ def validate_sql_query(query: str) -> str:
     """Valide et sécurise une requête SQL."""
     q = query.strip()
 
+    if not q:
+        raise ValueError("Requête SQL vide")
+
     # Autoriser uniquement SELECT ou WITH
     if not (q.upper().startswith("SELECT") or q.upper().startswith("WITH")):
         raise ValueError("Seules les requêtes SELECT ou WITH sont autorisées")
+
+    # Bloquer commentaires SQL
+    if "--" in q or "/*" in q or "*/" in q:
+        raise ValueError("Commentaires SQL non autorisés")
 
     # Bloquer mots dangereux
     if any(word in q.upper() for word in FORBIDDEN):
         raise ValueError("Requête SQL non autorisée")
 
+    # Éviter plusieurs requêtes séparées par ;
+    q_no_trailing = q.rstrip(";").strip()
+    if ";" in q_no_trailing:
+        raise ValueError("Une seule requête SQL est autorisée")
+
     # Ajouter LIMIT si absent
     if "LIMIT" not in q.upper():
-        q += " LIMIT 50"
+        q = q.rstrip(";") + " LIMIT 50"
 
     return q
 
@@ -275,6 +286,7 @@ def build_sql_prompt(question: str) -> str:
 
 
 def clean_llm_sql_output(text: str) -> str:
+    """Nettoie la sortie du LLM pour ne garder que la requête SQL."""
     text = text.strip()
     text = text.replace("```sql", "").replace("```", "").strip()
 
@@ -283,23 +295,25 @@ def clean_llm_sql_output(text: str) -> str:
     started = False
 
     for line in lines:
-        l = line.strip().upper()
+        stripped = line.strip()
+        upper = stripped.upper()
 
-        if l.startswith("WITH") or l.startswith("SELECT"):
+        if upper.startswith("WITH") or upper.startswith("SELECT"):
             started = True
 
         if started:
             sql_lines.append(line)
 
-    return "\n".join(sql_lines).strip()
+    cleaned = "\n".join(sql_lines).strip()
 
+    # Si le LLM a ajouté du texte après la requête, on coupe au dernier ;
+    if ";" in cleaned:
+        cleaned = cleaned[: cleaned.rfind(";") + 1]
 
-# =========================================================
-# Tool principal
-# =========================================================
+    return cleaned.strip()
 
-def sql_tool(question: str) -> List[Dict[str, Any]]:
-    """Pipeline complet : question → SQL → résultats"""
+def sql_tool_with_metadata(question: str) -> Dict[str, Any]:
+    """Pipeline complet : question → SQL → résultats + métadonnées."""
     logger.info("Question reçue: %s", question)
 
     sql_query = generate_sql_query(question)
@@ -307,28 +321,32 @@ def sql_tool(question: str) -> List[Dict[str, Any]]:
 
     results = run_sql_query(sql_query)
 
-    return results
+    return {
+        "question": question,
+        "sql_query": sql_query,
+        "rows": results,
+        "n_rows": len(results),
+    }
 
-if __name__ == "__main__":
-    from utils.logging_config import setup_logging
 
-    setup_logging()
+def sql_rows_to_context(question: str, rows: List[Dict[str, Any]]) -> str:
+    """Transforme les résultats SQL en pseudo-contexte textuel pour analyse."""
+    if not rows:
+        return f"Aucun résultat SQL trouvé pour la question : {question}"
 
-    questions = [
-        "Qui sont les 5 meilleurs scoreurs ?",
-        "Quelles sont les 5 équipes avec la meilleure moyenne de points ?",
-        "Quels sont les joueurs des Los Angeles Lakers avec le plus de points ?",
-        "Quels joueurs combinent le plus de points et de passes ?",
-        "Quelles équipes sont les plus mentionnées dans les reports ?"
-    ]
+    lines = [f"Résultats SQL pour la question : {question}"]
 
-    for q in questions:
-        print("\n" + "="*50)
-        print(f"Question: {q}")
+    for i, row in enumerate(rows, start=1):
+        parts = [f"{k}={v}" for k, v in row.items()]
+        lines.append(f"Ligne {i} : " + ", ".join(parts))
 
-        try:
-            result = sql_tool(q)
-            print("Résultat:")
-            print(result)
-        except Exception as e:
-            print("Erreur:", e)
+    return "\n".join(lines)
+
+# =========================================================
+# Tool principal
+# =========================================================
+
+def sql_tool(question: str) -> List[Dict[str, Any]]:
+    """Pipeline complet : question → SQL → résultats."""
+    payload = sql_tool_with_metadata(question)
+    return payload["rows"]
