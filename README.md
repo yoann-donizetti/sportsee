@@ -1,22 +1,31 @@
 # NBA Analyst AI — Assistant RAG avec Mistral
 
-Ce projet implémente un assistant IA basé sur la technique de **Retrieval-Augmented Generation (RAG)** pour répondre à des questions sur des données NBA.
+Ce projet implémente un assistant IA hybride pour répondre à des questions sur des données NBA, en combinant :
+
+- un **SQL Tool** pour les questions chiffrées et analytiques ;
+- un **pipeline RAG** pour les questions textuelles et contextuelles ;
+- un **mécanisme de refus** pour les questions hors périmètre, bruitées ou non supportées.
 
 L’objectif est de construire un système capable de :
-- répondre à des questions factuelles et analytiques ;
-- s’appuyer sur des données structurées ;
-- être évalué de manière rigoureuse (RAGAS).
+
+- répondre à des questions factuelles, analytiques et contextuelles ;
+- s’appuyer sur des données structurées et textuelles ;
+- limiter les hallucinations ;
+- être évalué de manière rigoureuse avec **RAGAS** et des indicateurs métier.
 
 ---
 
 ## Fonctionnalités
 
--  **Recherche sémantique** avec FAISS
--  **Génération de réponses** avec Mistral
--  **Évaluation automatique avec RAGAS**
--  **Dataset de test structuré** (questions simples, complexes, bruitées)
--  **Validation des données avec Pydantic**
--  **Observabilité avec Logfire + logging structuré**
+- **Recherche sémantique** avec FAISS
+- **Génération de réponses** avec Mistral
+- **Routing des questions** vers SQL, RAG ou refus
+- **SQL Tool** pour les questions chiffrées et les agrégations fiables
+- **Gestion du refus** sur les questions hors périmètre, bruitées ou non supportées
+- **Évaluation automatique avec RAGAS**
+- **Dataset de test structuré** (questions simples, complexes, comparatives, bruitées, non répondables)
+- **Validation des données avec Pydantic**
+- **Observabilité avec Logfire + logging structuré**
 
 ---
 
@@ -28,14 +37,22 @@ Le projet repose sur une architecture hybride combinant :
 
 1. **Base de données (PostgreSQL)**
    - stockage structuré des données NBA ;
-   - support pour les requêtes analytiques (SQL).
+   - support pour les requêtes analytiques ;
+   - exploitation de données textuelles structurées via la table `reports`.
 
 2. **Pipeline RAG**
    - récupération de contexte via FAISS ;
-   - génération de réponses avec Mistral.
+   - génération de réponses textuelles avec Mistral.
 
-3. **Évaluation automatique**
-   - mesure de la qualité via RAGAS.
+3. **Routing**
+   - orientation automatique des questions vers le bon composant :
+     - **SQL** pour les questions chiffrées ;
+     - **RAG** pour les questions textuelles ;
+     - **REFUS** pour les questions non supportées ou hors périmètre.
+
+4. **Évaluation automatique**
+   - mesure de la qualité via RAGAS ;
+   - suivi d’indicateurs complémentaires (`route_used`, `sql_success`, `refusal_ok`, `is_correct`).
 
 ---
 
@@ -43,42 +60,44 @@ Le projet repose sur une architecture hybride combinant :
 
 Le système s’appuie sur un pipeline structuré en plusieurs étapes :
 
-1. **Retrieval**
-   - indexation des documents (FAISS) ;
-   - recherche des contenus les plus pertinents.
+1. **Routing**
+   - détection du type de question ;
+   - orientation vers SQL, RAG ou refus.
 
-2. **Context building**
-   - sélection et agrégation des chunks ;
-   - construction du contexte envoyé au modèle.
+2. **Retrieval**
+   - recherche sémantique dans FAISS pour les questions textuelles.
 
-3. **Generation**
-   - appel au modèle Mistral ;
-   - production de la réponse finale.
+3. **Context building**
+   - sélection et agrégation des chunks pertinents.
 
-4. **Validation**
+4. **Generation / Synthesis**
+   - génération d’une réponse avec Mistral ;
+   - ou synthèse d’un résultat SQL en langage naturel.
+
+5. **Validation**
    - structuration des sorties avec Pydantic ;
    - contrôle du format et de la cohérence.
 
-5. **Évaluation**
-   - scoring avec RAGAS :
-     - faithfulness
-     - answer relevancy
-     - context precision
-     - context recall
+6. **Évaluation**
+   - scoring avec RAGAS ;
+   - suivi des performances métier et des refus.
 
 ---
 
-###  Vision cible
+### Vision du système final
 
-Faire évoluer le système vers une architecture hybride complète :
+Le système final repose sur une architecture hybride complète :
 
-- **SQL** → réponses fiables, calculs précis, données structurées  
-- **RAG** → contexte, explication, enrichissement  
+- **SQL** → réponses fiables, calculs précis, agrégations et comparaisons structurées ;
+- **RAG** → contexte textuel, synthèse et interprétation ;
+- **REFUS** → sécurité sur les questions hors périmètre, bruitées ou non supportées.
 
 Cette approche permet :
-- de réduire les hallucinations ;
+
+- de réduire fortement les hallucinations ;
 - d’améliorer la précision des réponses ;
-- d’augmenter la robustesse globale du système.
+- d’augmenter la robustesse globale du système ;
+- de mieux aligner la réponse avec le type réel de question posé.
 
 
 
@@ -99,12 +118,15 @@ Le projet s’appuie également sur une base de données PostgreSQL pour stocker
 
 ### Rôle dans le système
 
-- PostgreSQL permet de répondre à des questions **fiables et chiffrées**
-- le RAG permet d’apporter du **contexte et de l’interprétation**
+- PostgreSQL permet de répondre à des questions **fiables, chiffrées et agrégées**
+- certaines données textuelles structurées issues des reports peuvent aussi être exploitées via SQL
+- le RAG permet d’apporter du **contexte, de l’interprétation et des réponses qualitatives**
 
-Le système évolue vers une architecture hybride :
-- SQL → précision et fiabilité des données
-- RAG → enrichissement et compréhension du contexte
+Le système final repose sur :
+
+- **SQL** → précision, fiabilité, calculs et agrégations
+- **RAG** → enrichissement, synthèse et compréhension du contexte
+- **REFUS** → sécurité lorsque les données sont absentes ou insuffisantes
 
 ### Documentations
 - [README](database/README.md)
@@ -112,7 +134,7 @@ Le système évolue vers une architecture hybride :
 
 
 
-## SQL Tool (questions chiffrées)
+## SQL Tool (questions chiffrées et agrégations structurées)
 
 Le système intègre un SQL Tool permettant de répondre aux questions nécessitant des données chiffrées.
 
@@ -128,50 +150,83 @@ Exemples :
 
 - "Qui sont les meilleurs scoreurs ?"
 - "Quel joueur a le plus de rebonds ?"
+- "Quels joueurs sont les plus mentionnés dans les discussions Reddit ?"
 
 Ce module permet :
 
-- d'améliorer la précision
-- de réduire les hallucinations
-- de garantir la fiabilité des données numériques
+- d'améliorer la précision ;
+- de réduire les hallucinations ;
+- de garantir la fiabilité des données numériques ;
+- de traiter certaines agrégations simples sur des données textuelles structurées, par exemple via `related_player_names` dans la table `reports`.
 
 ## Routing des requêtes
 
-Le système utilise un mécanisme de routing simple pour orienter les questions :
+Le système utilise un mécanisme de routing pour orienter automatiquement les questions :
 
-- Questions chiffrées → SQL Tool
-- Questions textuelles → RAG
-- Questions hybrides → limitation actuelle
+- **Questions chiffrées / analytiques** → SQL Tool
+- **Questions textuelles / contextuelles** → RAG
+- **Questions hors périmètre, bruitées ou non supportées** → refus
+- **Certaines questions issues des reports** peuvent être traitées soit par RAG, soit par SQL lorsqu’une agrégation structurée est possible
 
-Ce routing permet d'améliorer la pertinence des réponses en utilisant le bon outil selon le type de question.
+Ce routing améliore la pertinence, la robustesse et la fiabilité des réponses en utilisant le bon composant selon le type de question.
 
 ## Exemples de questions
 
 - Qui sont les 5 meilleurs scoreurs ?
 - Quel joueur a le plus de rebonds ?
-- Quelle équipe a le meilleur offensive rating ?
-- Pourquoi Indiana impressionne cette saison ?
+- Quel joueur combine le plus de points et de passes décisives ?
+- Quels joueurs sont les plus mentionnés dans les discussions Reddit ?
+- Que disent les fans sur Haliburton ?
+- Quel joueur a le meilleur pourcentage à 3 points sur la saison ?
 
-##  Résultats (Baseline)
+## Résultats d’évaluation
 
-| Metric              | Score |
-|--------------------|------|
-| Faithfulness       | 0.53 |
-| Answer Relevancy   | 0.79 |
-| Context Precision  | 0.30 |
-| Context Recall     | 0.49 |
-| Refusal Rate       | 0.00 |
+Le projet a été évalué en trois étapes :
 
-Le score de refusal rate à 0.00 indique que le système ne sait pas refuser
-les questions hors périmètre et génère systématiquement une réponse,
-même lorsque l'information n'est pas disponible.
+1. **Baseline RAG seule**
+2. **Version intermédiaire SQL v1.1**
+3. **Version finale optimisée (SQL + routing + refus)**
 
-###  Interprétation
+### Baseline corrigée
 
-- Bonne compréhension globale des questions
-- Problèmes de fiabilité (hallucinations)
-- Retrieval encore bruité
-- Aucune gestion du refus (point critique)
+| Indicateur | Score |
+|------------|------|
+| Faithfulness | 0.44 |
+| Answer Relevancy | 0.73 |
+| Context Precision | 0.18 |
+| Context Recall | 0.36 |
+| Refusal Rate | 0.00 |
+
+### Version intermédiaire SQL v1.1
+
+| Indicateur | Score |
+|------------|------|
+| Faithfulness | 0.07 |
+| Answer Relevancy | 0.86 |
+| Context Precision | 0.04 |
+| Context Recall | 0.00 |
+| Refusal Rate | 0.00 |
+
+### Version optimisée finale
+
+| Indicateur | Score |
+|------------|------|
+| Faithfulness | **0.99** |
+| Answer Relevancy | **0.92** |
+| Context Precision | **0.75** |
+| Context Recall | **0.71** |
+| Refusal Rate | **1.00** |
+
+### Interprétation
+
+La version finale améliore fortement :
+
+- la fiabilité des réponses ;
+- la pertinence métier ;
+- la gestion des refus ;
+- la robustesse globale du système.
+
+Le système final utilise majoritairement le **SQL Tool** pour les questions structurées, le **RAG** pour les questions textuelles pertinentes, et le **refus** pour les cas hors périmètre.
 
 ---
 
@@ -180,24 +235,33 @@ même lorsque l'information n'est pas disponible.
 
 sportsee/
 │
-├── indexer.py                    # Script principal d’indexation des documents
-├── MistralChat.py                # Interface utilisateur Streamlit pour interroger le système
+├── indexer.py                    # Script principal d’indexation des documents (création des chunks, embeddings, index FAISS)
+├── MistralChat.py                # Interface utilisateur Streamlit pour interroger le système RAG
+├── requirements.txt              # Dépendances Python du projet
+├── README.md                     # Documentation principale du projet
+├── .gitignore                    # Fichiers et dossiers ignorés par Git
 │
 ├── database/                     # Gestion de la base PostgreSQL
+│   ├── create_readonly_user.sql  # Script SQL pour créer un utilisateur en lecture seule
+│   ├── db_utils.py               # Fonctions utilitaires pour l'accès et la gestion de la base de données
 │   ├── init_db.sql               # Initialisation de la base, de l’utilisateur et des droits
-│   ├── schema.sql                # Création du schéma SQL (tables, contraintes, index, commentaires)
-│   ├── schemas.py                # Schémas Pydantic pour valider les données avant insertion
 │   ├── load_excel_to_db.py       # Chargement des données structurées Excel dans PostgreSQL
 │   ├── load_reports.py           # Chargement des rapports PDF Reddit dans PostgreSQL
-|   ├── db_utils.py               # Fonctions utilitaires pour l'accès et la gestion de la base de données
-│   └── README.md                 # Documentation technique dédiée à la base de données
+│   ├── README.md                 # Documentation technique dédiée à la base de données
+│   ├── schema.sql                # Création du schéma SQL (tables, contraintes, index, commentaires)
+│   └── schemas.py                # Schémas Pydantic pour valider les données avant insertion
 │
 ├── rag_pipeline/                 # Pipeline RAG principal
 │   ├── config.py                 # Configuration globale du projet (modèles, chemins, DB, etc.)
-│   ├── rag_pipeline.py           # Logique de retrieval, construction de contexte et génération
-│   └── vector_store.py           # Gestion de l’index FAISS et de la recherche sémantique
+│   ├── llm_utils.py              # Fonctions utilitaires pour l’appel au LLM (Mistral)
+│   ├── rag_pipeline.py           # Logique de retrieval, construction de contexte et génération de réponse
+│   ├── router.py                 # Routage des questions vers SQL Tool ou RAG
+│   ├── vector_store.py           # Gestion de l’index FAISS et de la recherche sémantique
+│   └── tools/
+│       └── sql_tool.py           # Outil pour générer et exécuter des requêtes SQL via le LLM
 │
 ├── evaluate/                     # Évaluation automatique du système avec RAGAS
+│   ├── __init__.py               # Initialisation du module evaluate
 │   ├── core/                     # Modules internes de préparation et d’évaluation
 │   │   ├── cleaning.py           # Nettoyage / préparation des données d’évaluation
 │   │   ├── dataset_loader.py     # Chargement du dataset d’évaluation
@@ -206,16 +270,32 @@ sportsee/
 │   │   ├── safe_mistral.py       # Appels sécurisés au modèle Mistral
 │   │   ├── saver.py              # Sauvegarde des résultats d’évaluation
 │   │   └── schemas.py            # Validation Pydantic des données d’évaluation
-│   │
 │   ├── datasets/                 # Jeux de test pour l’évaluation
-│   │   └── rag_eval_dataset.json # Dataset de questions métier
-│   │
+│   │   ├── rag_eval_dataset.json # Dataset principal de questions métier
+│   │   └── archive/
+│   │       ├── rag_eval_dataset_baseline_v1.json # Anciennes versions du dataset d’évaluation
+│   │       └── rag_eval_dataset_baseline_v2.json # Anciennes versions du dataset d’évaluation
 │   ├── results/                  # Résultats générés par les évaluations
-│   │   └── baseline/             # Résultats de la baseline initiale
-│   │       ├── ragas_results.csv # Résultats détaillés par question
-│   │       └── ragas_summary.json# Résumé global des scores
-│   │
-│   └── scripts/                  # Scripts exécutables d’évaluation
+│   │   ├── baseline/
+│   │   │   ├── ragas.log         # Log d’exécution de l’évaluation baseline
+│   │   │   ├── ragas_results.csv # Résultats détaillés par question (baseline)
+│   │   │   └── ragas_summary.json# Résumé global des scores (baseline)
+│   │   ├── baseline_corrected/
+│   │   │   ├── ragas.log         # Log d’exécution de l’évaluation baseline corrigée
+│   │   │   ├── ragas_results.csv # Résultats détaillés par question (baseline corrigée)
+│   │   │   └── ragas_summary.json# Résumé global des scores (baseline corrigée)
+│   │   ├── v1_1_sql/
+│   │   │   ├── ragas_results.csv # Résultats détaillés par question (v1_1_sql)
+│   │   │   └── ragas_summary.json# Résumé global des scores (v1_1_sql)
+│   │   ├── v1_1_sql_corrigé/
+│   │   │   ├── ragas.log         # Log d’exécution de l’évaluation v1_1_sql corrigée
+│   │   │   ├── ragas_results.csv # Résultats détaillés par question (v1_1_sql corrigée)
+│   │   │   └── ragas_summary.json# Résumé global des scores (v1_1_sql corrigée)
+│   │   └── version optimisée/
+│   │       ├── ragas.log         # Log d’exécution de l’évaluation version optimisée
+│   │       ├── ragas_results.csv # Résultats détaillés par question (version optimisée)
+│   │       └── ragas_summary.json# Résumé global des scores (version optimisée)
+│   └── scripts/
 │       └── evaluate_ragas.py     # Script principal de lancement RAGAS
 │
 ├── utils/                        # Fonctions utilitaires partagées
@@ -224,18 +304,16 @@ sportsee/
 │
 ├── docs/                         # Documentation et rapports
 │   ├── rapport_ragas_baseline.md # Rapport d’analyse de la baseline RAGAS
-│   └── schema_sql.md             # Description fonctionnelle du schéma SQL
+│   ├── rapport_ragas_comparatif.md # Rapport d’analyse comparative RAGAS
+│   ├── rapport_ragas_optimisé.md   # Rapport d’analyse version optimisée RAGAS
+│   ├── schema_sql.md             # Description fonctionnelle du schéma SQL
+│   └── sql_queries_validation.md # Validation des requêtes SQL utilisées
 │
-├── inputs/                       # Données sources du projet
-│                                 # - fichier Excel NBA
-│                                 # - PDF Reddit / rapports
+├── inputs/                       # Données sources du projet (Excel NBA, PDF)
 │
 ├── vector_db/                    # Index vectoriel FAISS généré automatiquement
+│   ├── document_chunks.pkl       # Chunks de documents indexés (pickle)
 │   └── faiss_index.idx           # Fichier d’index utilisé pour le retrieval
-│
-├── requirements.txt              # Dépendances Python du projet
-├── README.md                     # Documentation principale du projet
-└── .gitignore                    # Fichiers et dossiers ignorés par Git
 ```
 ---
 
@@ -254,13 +332,14 @@ Gère la base vectorielle FAISS et la recherche sémantique :
 
 ### rag_pipeline/rag_pipeline.py
 
-Implémente le pipeline RAG complet :
+Implémente le pipeline principal du système :
 
-- récupération des documents pertinents (retrieval) ;
+- détection du type de question (routing) ;
+- orientation vers SQL, RAG ou refus ;
+- récupération des documents pertinents si nécessaire ;
 - construction du contexte ;
-- génération du prompt ;
-- appel au modèle Mistral ;
-- structuration de la réponse avec Pydantic.
+- génération d’une réponse ou synthèse SQL ;
+- structuration de la sortie avec Pydantic.
 
 ---
 
@@ -403,11 +482,14 @@ L'application sera accessible à l'adresse http://localhost:8501 dans votre navi
 python -m evaluate.scripts.evaluate_ragas
 ```
 
-Les résultats sont générés dans :
+Les résultats sont générés dans le dossier `evaluate/results/` selon la version évaluée.
 
-- [Résultats détaillés RAGAS (CSV)](evaluate/results/ragas_results.csv)
-- [Résumé des scores RAGAS (JSON)](evaluate/results/ragas_summary.json)
-- [Rapport d’évaluation RAGAS (baseline)](docs/rapport_ragas_baseline.md)
+Rapports disponibles :
+
+- [Rapport baseline](docs/rapport_ragas_baseline.md)
+- [Rapport comparatif](docs/rapport_ragas_comparatif.md)
+- [Rapport version optimisée](docs/rapport_ragas_optimisé.md)
+
 
 ## Dataset d’évaluation
 Le système est testé sur :
@@ -419,20 +501,26 @@ Le système est testé sur :
 
 ## Limites actuelles
 
-- hallucinations sur certaines questions
-- mauvaise gestion des données absentes
-- retrieval perfectible (bruit + manque de précision)
-- gestion imparfaite des questions hybrides (SQL + RAG)
-- dépendance au mapping langage naturel → SQL
-- absence de fallback intelligent en cas d'erreur SQL
+- certaines comparaisons restent perfectibles ;
+- certaines questions subjectives dépendent fortement du contenu réellement disponible dans les reports ;
+- la qualité du système dépend encore partiellement du mapping langage naturel → SQL ;
+- les questions hybrides très complexes restent plus difficiles à traiter ;
+- RAGAS reste imparfait pour évaluer certains comportements d’un système hybride.
 
 
 ## Améliorations prévues
 
-- intégration d’un Tool SQL pour les questions chiffrées
-- meilleure gestion du refus
-- amélioration du retrieval (chunking, reranking)
-- seconde évaluation comparative
+- ajout d’une API REST pour exposer le système ;
+- amélioration des comparaisons complexes ;
+- ajout éventuel d’un score de confiance ;
+- amélioration du routing sur certains cas hybrides ;
+- enrichissement de l’évaluation pour les systèmes hybrides.
 
 ## Objectif
-Faire évoluer le système d’un assistant **convaincant** vers un assistant **fiable et robuste**, capable de répondre correctement à des questions métier complexes.
+Le système final vise à fournir des réponses fiables sur des données NBA en combinant :
+
+- **SQL** pour les questions structurées et chiffrées ;
+- **RAG** pour les questions textuelles et contextuelles ;
+- **REFUS** pour les questions hors périmètre ou non supportées.
+
+L’objectif est de proposer un assistant **fiable, robuste et mieux aligné avec les besoins métier**.
