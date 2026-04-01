@@ -2,14 +2,26 @@
 
 Cette évaluation constitue la baseline du système avant intégration des données structurées (SQL Tool).
 
+
+## Vérification et correction du dataset d’évaluation
+
+Lors de l’analyse détaillée des résultats, une vérification manuelle avec les données sources a permis d’identifier plusieurs incohérences dans le dataset d’évaluation initial, notamment sur certaines vérités terrain.
+
+Ces incohérences pouvaient produire des faux négatifs et biaiser l’évaluation du système.
+
+Une vérification manuelle systématique a donc été réalisée en comparant les réponses attendues avec les données sources.
+
+Le dataset a ensuite été corrigé, puis l’évaluation RAGAS relancée afin d’obtenir une baseline fiable et exploitable.
+
+
 **Accès aux ressources**
 
 Ces fichiers permettent de reproduire l’évaluation et d’analyser les résultats détaillés du système RAG.
 
--  [Résultats détaillés (CSV)](../evaluate/results/ragas_results.csv)
--  [Résumé (JSON)](../evaluate/results/ragas_summary.json)
+-  [Résultats détaillés (CSV)](../evaluate/results/baseline_corrected/ragas_results.csv)
+-  [Résumé (JSON)](../evaluate/results/baseline_corrected/ragas_summary.json)
 -  [Script d’évaluation RAGAS](../evaluate/scripts/evaluate_ragas.py)
--  [Jeu de test](../evaluate/datasets/rag_eval_dataset.json)
+-  [Jeu de test](../evaluate/datasets/archive/rag_eval_dataset_baseline_v2.json)
 
 ## Contexte
 
@@ -88,53 +100,53 @@ Cette architecture constitue une **baseline instrumentée**, permettant d’anal
 
 ### Tableau de synthèse
 
-| Indicateur         | Score | Lecture                                 |
-|--------------------|-------|------------------------------------------|
-| Faithfulness       | 0.53  | Fidélité moyenne → risque d’extrapolation |
-| Answer Relevancy   | 0.79  | Bonne compréhension des questions         |
-| Context Precision  | 0.30  | Beaucoup de bruit dans les contextes      |
-| Context Recall     | 0.49  | Couverture partielle                      |
-| Refusal Rate       | 0.00  | Aucun refus → hallucinations              |
+| Indicateur         | Score | Lecture |
+|--------------------|-------|---------|
+| Faithfulness       | 0.44  | Fidélité moyenne : le système s’appuie partiellement sur les données, mais certaines réponses restent peu fiables |
+| Answer Relevancy   | 0.73  | Compréhension correcte des questions dans l’ensemble, malgré plusieurs réponses inadaptées |
+| Context Precision  | 0.18  | Beaucoup de bruit dans les contextes récupérés : les informations utiles sont souvent noyées |
+| Context Recall     | 0.36  | Couverture partielle : une partie des informations nécessaires est récupérée, mais pas de manière systématique |
+| Refusal Rate       | 0.00  | Aucun refus correct : le système hallucine encore sur les questions hors périmètre |
 
 Le score de **refusal rate à 0.00** indique que le système n’a correctement refusé aucune des questions non répondables.  
 Les 3 questions hors périmètre ont toutes donné lieu à une réponse, ce qui confirme un problème critique d’hallucination.
 
 ### Par type de question (moyennes)
 
-| Catégorie         | Faithfulness | Relevancy | Precision | Recall | Lecture                                 |
-|-------------------|--------------|-----------|-----------|--------|------------------------------------------|
-| Factuel simple    | 0.61         | 0.74      | 0.45      | 0.67   | le plus fiable                         |
-| Factuel complexe  | 0.28         | 0.91      | 0.17      | 0.50   | convaincant mais peu fiable            |
-| Comparaison       | 0.43         | 0.74      | 0.29      | 0.42   | moyen                                    |
-| Subjectif         | 0.64         | 0.85      | 0.00      | 0.00   | fluide mais sans preuve                |
+| Catégorie         | Faithfulness | Relevancy | Precision | Recall | Lecture |
+|-------------------|--------------|-----------|-----------|--------|---------|
+| Factuel simple    | 0.53         | 0.59      | 0.22      | 0.50   | Questions parfois bien traitées, mais avec encore plusieurs erreurs factuelles ou contextes peu utiles |
+| Factuel complexe  | 0.29         | 0.91      | 0.17      | 0.00   | Le système comprend bien la question, mais la réponse reste peu fiable et peu ancrée dans les données |
+| Comparaison       | 0.10         | 0.82      | 0.25      | 0.67   | Bonne compréhension globale, mais difficultés à produire des comparaisons réellement fondées |
+| Subjectif         | 0.69         | 0.86      | 0.00      | 0.00   | Réponses fluides et convaincantes, mais sans véritable appui sur un contexte vérifiable |
 
+Les résultats montrent des comportements différents selon la complexité des questions :
 
-- Quand la question est simple, le système est globalement fiable
-- Quand la question devient complexe, il reste convaincant mais fait plus d’erreurs
-- Quand il faut comparer, il comprend mais manque de précision
-- Quand la question est subjective, il répond bien… mais sans preuve
-
+- Les questions factuelles simples sont les mieux traitées
+- Les questions complexes ou comparatives entraînent davantage d’erreurs
+- Les questions subjectives produisent des réponses fluides mais peu fiables
 
 ## Analyse avec exemple
 
 L’analyse ci‑dessous s’appuie directement sur les 15 questions utilisées pour l’évaluation, afin d’illustrer concrètement le comportement du système dans des situations variées.
 
 ### Cas réussis — Questions simples
-*Exemple : Question 2 :*
+*Exemple : Question 8 :*
 
-**Q :** « Quelle équipe a marqué le plus de points ? »
+**Q :** « Quel joueur a marqué le plus de points sur la saison ? »
 
-**Réponse du système :** Oklahoma City Thunder
+**Réponse du système :** Shai Gilgeous-Alexander (2485 points)
 
 **Évaluation :**
--  Donnée présente dans le dataset  
--  Réponse correcte  
--  Bonne utilisation des informations récupérées
+- Donnée présente dans le dataset  
+- Réponse correcte  
+- Bonne utilisation des informations récupérées  
+- Scores RAGAS élevés (faithfulness, relevancy, precision, recall)
 
 **Interprétation :**
-- Retrieval efficace : les données pertinentes ont été trouvées.
-- Génération correcte : la réponse est fidèle et factuelle.
-- Le système est fiable sur les questions simples et directes
+- Retrieval efficace : les bonnes données ont été récupérées dans le contexte.
+- Génération maîtrisée : la réponse est cohérente, justifiée et fidèle aux données.
+- Le système est capable de fournir des réponses fiables sur des questions factuelles simples lorsque l’information est clairement présente.
 
 ### Cas partiellement réussis
 *Exemple : Question 1 :*
@@ -189,23 +201,27 @@ L’analyse ci‑dessous s’appuie directement sur les 15 questions utilisées 
 - En réalité, elle repose sur des inventions et non sur les données disponibles.
 - Ce type de comportement est particulièrement trompeur : la forme est convaincante, mais le fond est faux.
 
-### Mélange données / connaissances générales
+
+### Mélange entre données disponibles et connaissances générales
+
 *Exemple : Question 11 :*
+
 **Q :** « Qui a le plus de passes décisives ? »
 
-**Réponse du système :** Fournit une réponse basée sur des tendances générales de la NBA.
+**Réponse du système :** Le système explique que l’information n’est pas directement visible dans les feuilles fournies, puis propose une réponse probable à partir de tendances générales de la NBA.
 
 **Évaluation :**
--  Réponse issue de connaissances générales  
--  Aucune utilisation du dataset fourni  
--  Absence de justification basée sur le contexte
+- Réponse non strictement fondée sur le dataset
+- Utilisation d’hypothèses externes
+- Manque de traçabilité par rapport aux sources réellement fournies
 
 **Interprétation :**
-- Le système sort du cadre RAG : il ne se limite plus aux données disponibles.
-- Cela entraîne une perte de fiabilité, car la réponse ne reflète pas le dataset mais des connaissances externes.
-- Ce comportement est problématique : il donne l’illusion d’une réponse pertinente, alors qu’elle n’est pas fondée sur les sources attendues.
+- Le système n’arrive pas à extraire directement la bonne information depuis le contexte disponible.
+- Il compense en mobilisant des connaissances générales, ce qui donne une réponse plausible mais non fiable dans le cadre du projet.
+- Ce comportement justifie l’ajout ultérieur d’un Tool SQL pour les questions statistiques.
 
-### Questions non répondable
+
+### Questions non répondables
 *Exemple : Question 13 :*
 
 **Q :** « % à 3 points sur les 5 derniers matchs »
@@ -228,12 +244,12 @@ L’analyse ci‑dessous s’appuie directement sur les 15 questions utilisées 
 Deux tendances fortes se dégagent :
 
 1. Bonne compréhension globale
-    - Relevancy toujours élevée (0.74 à 0.91)
-    - Le modèle comprend bien les questions
-2. Manque de fiabilité dès que la difficulté augmente
+   - Relevancy élevée (0.73)
+   - Le modèle comprend bien les questions
 
-    - Chute de la faithfulness (jusqu’à 0.28)
-    - Precision faible (jusqu’à 0.17)
+2. Manque de fiabilité dès que la difficulté augmente
+   - Faithfulness faible (0.44)
+   - Context precision très faible (0.18)
 
 Cela signifie que :
 

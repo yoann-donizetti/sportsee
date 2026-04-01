@@ -20,14 +20,39 @@ import logging
 from typing import Optional
 
 import logfire
-from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
 
-from .config import MISTRAL_API_KEY, MODEL_NAME, NAME, SEARCH_K
+from .config import (
+    MISTRAL_API_KEY,
+    MODEL_NAME,
+    NAME,
+    SEARCH_K,
+    RAG_SYSTEM_PROMPT_TEMPLATE,
+    SQL_SYNTHESIS_PROMPT_TEMPLATE,
+    RAG_TEMPERATURE,
+    SQL_TEMPERATURE,
+    RAG_UNAVAILABLE_MESSAGE,
+    SQL_ERROR_MESSAGE,
+    SQL_NO_RESULT_MESSAGE,
+    EMPTY_PROMPT_MESSAGE,
+    MISTRAL_ERROR_MESSAGE,
+    NO_RAG_CONTEXT_MESSAGE,
+)
 from .vector_store import VectorStoreManager
 from evaluate.core.schemas import RagPipelineOutput
-from rag_pipeline.router import is_sql_question, format_sql_result
-from rag_pipeline.tools.sql_tool import sql_tool
+from rag_pipeline.router import (
+    is_sql_question,
+    is_unsupported_question,
+    is_noisy_question,
+    is_subjective_question,
+    is_reports_question,
+    build_refusal_answer,
+)
+
+from rag_pipeline.tools.sql_tool import (
+    sql_tool_with_metadata,
+    sql_rows_to_context,
+)
 from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
@@ -35,35 +60,10 @@ logger = logging.getLogger(__name__)
 # Initialisation de Logfire pour tracer les étapes du pipeline RAG
 logfire.configure(send_to_logfire=False)
 
-# --- Configuration de l'API Mistral ---
-if not MISTRAL_API_KEY:
-    raise ValueError(
-        "Erreur : Clé API Mistral non trouvée (MISTRAL_API_KEY). "
-        "Veuillez la définir dans le fichier .env."
-    )
-
-try:
-    client = MistralClient(api_key=MISTRAL_API_KEY)
-    logger.info("Client Mistral initialisé.")
-except Exception as e:
-    logger.exception("Erreur initialisation client Mistral")
-    raise RuntimeError(
-        f"Erreur lors de l'initialisation du client Mistral : {e}"
-    ) from e
 
 
-# --- Prompt système ---
-SYSTEM_PROMPT = f"""Tu es '{NAME} Analyst AI', un assistant expert sur la ligue de basketball NBA.
-Ta mission est de répondre aux questions des fans en animant le débat.
 
----
-{{context_str}}
----
 
-QUESTION DU FAN:
-{{question}}
-
-RÉPONSE DE L'ANALYSTE NBA:"""
 
 
 def get_vector_store_manager() -> Optional[VectorStoreManager]:
@@ -101,17 +101,10 @@ def get_vector_store_manager() -> Optional[VectorStoreManager]:
 
 
 def generer_reponse(prompt_messages: list[ChatMessage]) -> str:
-    """Génère une réponse via l'API Mistral.
-
-    Args:
-        prompt_messages: Liste de messages à envoyer au modèle.
-
-    Returns:
-        La réponse texte générée par le modèle, ou un message d'erreur.
-    """
+    """Génère une réponse via l'API Mistral."""
     if not prompt_messages:
         logger.warning("Tentative de génération de réponse avec un prompt vide.")
-        return "Je ne peux pas traiter une demande vide."
+        return EMPTY_PROMPT_MESSAGE
 
     try:
         logger.info(
@@ -120,25 +113,22 @@ def generer_reponse(prompt_messages: list[ChatMessage]) -> str:
             len(prompt_messages),
         )
 
-        response = client.chat(
-            model=MODEL_NAME,
-            messages=prompt_messages,
-            temperature=0.1,
+        prompt_text = "\n\n".join(
+            f"{msg.role.upper()}:\n{msg.content}" for msg in prompt_messages
         )
 
-        if response.choices and len(response.choices) > 0:
-            logger.info("Réponse reçue de l'API Mistral.")
-            return response.choices[0].message.content
+        response_text = ask_mistral(
+            prompt=prompt_text,
+            model=MODEL_NAME,
+            temperature=RAG_TEMPERATURE,
+        )
 
-        logger.warning("L'API n'a pas retourné de choix valide.")
-        return "Désolé, je n'ai pas pu générer de réponse valide pour le moment."
+        logger.info("Réponse reçue de l'API Mistral.")
+        return response_text
 
     except Exception:
-        logger.exception("Erreur API Mistral pendant client.chat")
-        return (
-            "Je suis désolé, une erreur technique m'empêche de répondre. "
-            "Veuillez réessayer plus tard."
-        )
+        logger.exception("Erreur API Mistral pendant ask_mistral")
+        return MISTRAL_ERROR_MESSAGE
 
 
 def construire_contexte(search_results: list[dict]) -> str:
@@ -151,7 +141,7 @@ def construire_contexte(search_results: list[dict]) -> str:
         Une chaîne formatée pour être injectée dans le prompt.
     """
     if not search_results:
-        return "Aucune information pertinente trouvée dans la base de connaissances pour cette question."
+        return NO_RAG_CONTEXT_MESSAGE
 
     context_str = "\n\n---\n\n".join(
         [
@@ -167,43 +157,28 @@ def construire_contexte(search_results: list[dict]) -> str:
 
 
 def construire_prompt(question: str, context_str: str) -> str:
-    """Construit le prompt final pour le modèle.
+    """Construit le prompt final pour le modèle en injectant la question et le contexte."""
+    return RAG_SYSTEM_PROMPT_TEMPLATE.format(
+        name=NAME,
+        context_str=context_str,
+        question=question,
+    ).strip()
 
-    Args:
-        question: Question utilisateur.
-        context_str: Contexte récupéré depuis le Vector Store.
-
-    Returns:
-        Le prompt final formaté.
-    """
-    return SYSTEM_PROMPT.format(context_str=context_str, question=question)
 
 def synthesize_sql_answer(question: str, rows: list[dict]) -> str:
-    """Reformule les résultats SQL en réponse naturelle."""
     if not rows:
-        return "Je n'ai trouvé aucun résultat pour cette question."
+        return SQL_NO_RESULT_MESSAGE
 
-    prompt = f"""
-Tu es un assistant expert NBA.
+    prompt = SQL_SYNTHESIS_PROMPT_TEMPLATE.format(
+        question=question,
+        rows=rows,
+    ).strip()
 
-Question :
-{question}
-
-Résultats SQL :
-{rows}
-
-Ta mission :
-- Reformule une réponse claire en français
-- Sois naturel et concis
-- Si plusieurs lignes, fais une phrase fluide
-- Ne mentionne pas SQL
-- Utilise uniquement les résultats fournis
-
-Réponse :
-""".strip()
-
-    return ask_mistral(prompt, model=MODEL_NAME)
-
+    return ask_mistral(
+        prompt=prompt,
+        model=MODEL_NAME,
+        temperature=SQL_TEMPERATURE,
+    )
 
 def poser_question(
     prompt: str,
@@ -214,41 +189,90 @@ def poser_question(
     logfire.info("Question utilisateur", question=prompt)
 
     # =========================================================
-    # Routage SQL
+    # Questions à refuser directement
+    # =========================================================
+    if is_unsupported_question(prompt):
+        logger.info("Question non supportée détectée : %s", prompt)
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=build_refusal_answer(prompt),
+            search_results=[],
+            context_str="",
+            final_prompt_for_llm="",
+            messages_for_api=[],
+            route_used="REFUS",
+            sql_success=False,
+        )
+        logger.info("Route choisie : REFUS_UNSUPPORTED")
+        return result.model_dump()
+
+    if is_noisy_question(prompt):
+        logger.info("Question bruitée détectée : %s", prompt)
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=build_refusal_answer(prompt),
+            search_results=[],
+            context_str="",
+            final_prompt_for_llm="",
+            messages_for_api=[],
+            route_used="REFUS",
+            sql_success=False,
+        )
+        logger.info("Route choisie : REFUS_NOISY")
+        return result.model_dump()
+
+    # =========================================================
+    # Routage SQL (questions statistiques / mesurables)
     # =========================================================
     if is_sql_question(prompt):
         logger.info("Question détectée comme SQL : %s", prompt)
 
         try:
-            sql_results = sql_tool(prompt)
+            payload = sql_tool_with_metadata(prompt)
+
+            sql_results = payload["rows"]
+            sql_query = payload["sql_query"]
+
             sql_answer = synthesize_sql_answer(prompt, sql_results)
+            sql_context = sql_rows_to_context(prompt, sql_results)
 
             result = RagPipelineOutput(
                 question=prompt,
                 answer=sql_answer,
                 search_results=[],
-                context_str="",
-                final_prompt_for_llm="",
+                context_str=sql_context,
+                final_prompt_for_llm=sql_query,
                 messages_for_api=[],
+                route_used="SQL",
+                sql_success=True,
             )
+
             logger.info("Route choisie : SQL")
             return result.model_dump()
 
         except Exception:
-            logger.exception("Erreur pendant l'exécution du SQL tool pour la question : %s", prompt)
+            logger.exception(
+                "Erreur pendant l'exécution du SQL tool pour la question : %s",
+                prompt,
+            )
 
             result = RagPipelineOutput(
                 question=prompt,
-                answer="Une erreur est survenue pendant l'interrogation SQL.",
+                answer=SQL_ERROR_MESSAGE,
                 search_results=[],
                 context_str="",
                 final_prompt_for_llm="",
                 messages_for_api=[],
+                route_used="SQL",
+                sql_success=False,
             )
+
             return result.model_dump()
 
     # =========================================================
-    # Pipeline RAG actuel
+    # Chargement du Vector Store pour les routes RAG
     # =========================================================
     if vector_store_manager is None:
         vector_store_manager = get_vector_store_manager()
@@ -258,17 +282,128 @@ def poser_question(
 
         result = RagPipelineOutput(
             question=prompt,
-            answer=(
-                "Le service de recherche de connaissances n'est pas disponible. "
-                "Impossible de traiter votre demande."
-            ),
+            answer=RAG_UNAVAILABLE_MESSAGE,
             search_results=[],
             context_str="",
             final_prompt_for_llm="",
             messages_for_api=[],
+            route_used="RAG",
+            sql_success=False,
         )
         return result.model_dump()
 
+    # =========================================================
+    # Questions textuelles liées aux reports / Reddit / fans
+    # =========================================================
+    if is_reports_question(prompt):
+        logger.info("Question reports détectée : %s", prompt)
+
+        try:
+            logger.info(
+                "Recherche de contexte reports pour la question: '%s' avec k=%s",
+                prompt,
+                k,
+            )
+            search_results = vector_store_manager.search(prompt, k=k)
+            logger.info("%s chunks trouvés dans le Vector Store.", len(search_results))
+
+            logfire.info(
+                "Résultats de recherche",
+                n_chunks=len(search_results),
+            )
+
+        except Exception:
+            logger.exception(
+                "Erreur pendant vector_store_manager.search pour la query: %s",
+                prompt,
+            )
+            search_results = []
+
+            logfire.info(
+                "Résultats de recherche",
+                n_chunks=0,
+            )
+
+        if not search_results:
+            logger.info("Aucun contexte trouvé pour question reports, refus.")
+
+            result = RagPipelineOutput(
+                question=prompt,
+                answer=build_refusal_answer(prompt),
+                search_results=[],
+                context_str="",
+                final_prompt_for_llm="",
+                messages_for_api=[],
+                route_used="REFUS",
+                sql_success=False,
+            )
+            logger.info("Route choisie : REFUS_REPORTS")
+            return result.model_dump()
+
+        context_str = construire_contexte(search_results)
+
+        logfire.info(
+            "Contexte construit",
+            longueur=len(context_str),
+        )
+
+        final_prompt_for_llm = construire_prompt(prompt, context_str)
+
+        logfire.info(
+            "Prompt généré",
+            longueur=len(final_prompt_for_llm),
+        )
+
+        messages_for_api = [
+            ChatMessage(role="user", content=final_prompt_for_llm)
+        ]
+
+        response_content = generer_reponse(messages_for_api)
+
+        logfire.info(
+            "Réponse générée",
+            longueur=len(response_content),
+        )
+        logger.info("Route choisie : RAG (reports)")
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=response_content,
+            search_results=search_results,
+            context_str=context_str,
+            final_prompt_for_llm=final_prompt_for_llm,
+            messages_for_api=[
+                {"role": msg.role, "content": msg.content}
+                for msg in messages_for_api
+            ],
+            route_used="RAG",
+            sql_success=False,
+        )
+
+        return result.model_dump()
+
+    # =========================================================
+    # Questions subjectives globales : refus
+    # =========================================================
+    if is_subjective_question(prompt):
+        logger.info("Question subjective globale détectée : %s", prompt)
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=build_refusal_answer(prompt),
+            search_results=[],
+            context_str="",
+            final_prompt_for_llm="",
+            messages_for_api=[],
+            route_used="REFUS",
+            sql_success=False,
+        )
+        logger.info("Route choisie : REFUS_SUBJECTIVE")
+        return result.model_dump()
+
+    # =========================================================
+    # Pipeline RAG classique
+    # =========================================================
     try:
         logger.info("Recherche de contexte pour la question: '%s' avec k=%s", prompt, k)
         search_results = vector_store_manager.search(prompt, k=k)
@@ -278,6 +413,7 @@ def poser_question(
             "Résultats de recherche",
             n_chunks=len(search_results),
         )
+
     except Exception:
         logger.exception(
             "Erreur pendant vector_store_manager.search pour la query: %s",
@@ -318,6 +454,7 @@ def poser_question(
         longueur=len(response_content),
     )
     logger.info("Route choisie : RAG")
+
     result = RagPipelineOutput(
         question=prompt,
         answer=response_content,
@@ -328,6 +465,8 @@ def poser_question(
             {"role": msg.role, "content": msg.content}
             for msg in messages_for_api
         ],
+        route_used="RAG",
+        sql_success=False,
     )
 
     return result.model_dump()

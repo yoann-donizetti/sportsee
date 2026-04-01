@@ -55,7 +55,12 @@ def build_ragas_rows(samples: list[Any], search_k: int) -> list[dict[str, Any]]:
             k=search_k,
         )
 
-        retrieved_contexts = [res["text"] for res in result["search_results"]]
+        route_used = result.get("route_used", "UNKNOWN")
+
+        if route_used == "SQL":
+            retrieved_contexts = [result["context_str"]] if result.get("context_str") else []
+        else:
+            retrieved_contexts = [res["text"] for res in result["search_results"]]
 
         rows.append(
             {
@@ -67,6 +72,8 @@ def build_ragas_rows(samples: list[Any], search_k: int) -> list[dict[str, Any]]:
                 "answer": result["answer"],
                 "contexts": retrieved_contexts,
                 "nb_contexts": len(retrieved_contexts),
+                "route_used": result.get("route_used", "UNKNOWN"),
+                "sql_success": result.get("sql_success", False),
             }
         )
 
