@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 
 from sqlalchemy import create_engine, text
 
-from rag_pipeline.config import MODEL_NAME,DATABASE_URL_LLM
+from rag_pipeline.config import MODEL_NAME,DATABASE_URL_LLM,SQL_GENERATION_PROMPT_TEMPLATE
 from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
@@ -127,6 +127,12 @@ reports
 - related_team_codes : liste des équipes détectées (séparées par des virgules)
 - related_player_names : liste des joueurs détectés (séparés par des virgules)
 
+Important pour reports :
+- Pour compter les joueurs les plus mentionnés dans les documents textuels, utiliser la colonne related_player_names.
+- related_player_names doit être découpé avec string_to_array(related_player_names, ',') puis unnest.
+- Toujours nettoyer les noms avec TRIM avant agrégation.
+- Pour ce type de question, ne pas analyser report_text directement si related_player_names suffit.
+
 Relations :
 - players.team_code = teams.team_code
 - stats.player_id = players.player_id
@@ -237,6 +243,39 @@ CROSS JOIN top_passer tp
 LIMIT 1;
 """.strip(),
 },
+{
+    "question": "Quel joueur est le plus complet entre points, rebonds et passes ?",
+    "sql": """
+SELECT
+    p.player_name,
+    s.pts,
+    s.reb,
+    s.ast,
+    (s.pts + s.reb + s.ast) AS total_contribution
+FROM stats s
+JOIN players p ON s.player_id = p.player_id
+ORDER BY total_contribution DESC
+LIMIT 1;
+""".strip(),
+},
+{
+    "question": "Quels joueurs sont les plus mentionnés dans les discussions Reddit ?",
+    "sql": """
+SELECT
+    player_name,
+    COUNT(*) AS mention_count
+FROM (
+    SELECT
+        TRIM(unnest(string_to_array(related_player_names, ','))) AS player_name
+    FROM reports
+    WHERE related_player_names IS NOT NULL
+) AS extracted
+WHERE player_name <> ''
+GROUP BY player_name
+ORDER BY mention_count DESC, player_name ASC
+LIMIT 10;
+""".strip(),
+},
 ]
 
 
@@ -257,32 +296,11 @@ def build_sql_prompt(question: str) -> str:
         for ex in FEW_SHOTS
     )
 
-    return f"""
-        Tu es un assistant expert en SQL PostgreSQL.
-
-        Ta tâche est de générer une requête SQL valide à partir d'une question utilisateur.
-
-        {SCHEMA_CONTEXT}
-
-        Exemples :
-        {examples}
-
-        Contraintes :
-        - Génère uniquement du SQL
-        - Utilise uniquement SELECT
-        - N'utilise jamais INSERT, UPDATE, DELETE, DROP, ALTER, CREATE ou TRUNCATE
-        - N'utilise jamais SELECT *
-        - Utilise des JOIN explicites si nécessaire
-        - Ajoute toujours LIMIT si la requête peut retourner plusieurs lignes
-        - Utilise uniquement les tables et colonnes décrites dans le schéma
-        - Si la question demande une comparaison entre deux profils extrêmes (ex: meilleur scoreur vs meilleur passeur), identifie d'abord chaque joueur avec une sous-requête ou un CTE.
-        - Si la question est trop ambiguë pour produire une requête fiable, retourne une requête SQL simple de comparaison entre les leaders concernés.
-        - N'invente jamais de colonnes qui ne figurent pas dans le schéma.
-        Question utilisateur :
-        {question}
-
-        SQL :
-        """.strip()
+    return SQL_GENERATION_PROMPT_TEMPLATE.format(
+        schema_context=SCHEMA_CONTEXT,
+        examples=examples,
+        question=question,
+    )
 
 
 def clean_llm_sql_output(text: str) -> str:

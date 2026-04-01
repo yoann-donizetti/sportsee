@@ -45,9 +45,14 @@ from rag_pipeline.router import (
     is_unsupported_question,
     is_noisy_question,
     is_subjective_question,
+    is_reports_question,
     build_refusal_answer,
 )
-from rag_pipeline.tools.sql_tool import sql_tool,sql_tool_with_metadata, sql_rows_to_context
+
+from rag_pipeline.tools.sql_tool import (
+    sql_tool_with_metadata,
+    sql_rows_to_context,
+)
 from rag_pipeline.llm_utils import ask_mistral
 
 logger = logging.getLogger(__name__)
@@ -184,7 +189,7 @@ def poser_question(
     logfire.info("Question utilisateur", question=prompt)
 
     # =========================================================
-    # Questions à refuser
+    # Questions à refuser directement
     # =========================================================
     if is_unsupported_question(prompt):
         logger.info("Question non supportée détectée : %s", prompt)
@@ -218,24 +223,8 @@ def poser_question(
         logger.info("Route choisie : REFUS_NOISY")
         return result.model_dump()
 
-    if is_subjective_question(prompt):
-        logger.info("Question subjective détectée : %s", prompt)
-
-        result = RagPipelineOutput(
-            question=prompt,
-            answer=build_refusal_answer(prompt),
-            search_results=[],
-            context_str="",
-            final_prompt_for_llm="",
-            messages_for_api=[],
-            route_used="REFUS",
-            sql_success=False,
-        )
-        logger.info("Route choisie : REFUS_SUBJECTIVE")
-        return result.model_dump()
-
     # =========================================================
-    # Routage SQL
+    # Routage SQL (questions statistiques / mesurables)
     # =========================================================
     if is_sql_question(prompt):
         logger.info("Question détectée comme SQL : %s", prompt)
@@ -283,7 +272,7 @@ def poser_question(
             return result.model_dump()
 
     # =========================================================
-    # Pipeline RAG
+    # Chargement du Vector Store pour les routes RAG
     # =========================================================
     if vector_store_manager is None:
         vector_store_manager = get_vector_store_manager()
@@ -303,6 +292,118 @@ def poser_question(
         )
         return result.model_dump()
 
+    # =========================================================
+    # Questions textuelles liées aux reports / Reddit / fans
+    # =========================================================
+    if is_reports_question(prompt):
+        logger.info("Question reports détectée : %s", prompt)
+
+        try:
+            logger.info(
+                "Recherche de contexte reports pour la question: '%s' avec k=%s",
+                prompt,
+                k,
+            )
+            search_results = vector_store_manager.search(prompt, k=k)
+            logger.info("%s chunks trouvés dans le Vector Store.", len(search_results))
+
+            logfire.info(
+                "Résultats de recherche",
+                n_chunks=len(search_results),
+            )
+
+        except Exception:
+            logger.exception(
+                "Erreur pendant vector_store_manager.search pour la query: %s",
+                prompt,
+            )
+            search_results = []
+
+            logfire.info(
+                "Résultats de recherche",
+                n_chunks=0,
+            )
+
+        if not search_results:
+            logger.info("Aucun contexte trouvé pour question reports, refus.")
+
+            result = RagPipelineOutput(
+                question=prompt,
+                answer=build_refusal_answer(prompt),
+                search_results=[],
+                context_str="",
+                final_prompt_for_llm="",
+                messages_for_api=[],
+                route_used="REFUS",
+                sql_success=False,
+            )
+            logger.info("Route choisie : REFUS_REPORTS")
+            return result.model_dump()
+
+        context_str = construire_contexte(search_results)
+
+        logfire.info(
+            "Contexte construit",
+            longueur=len(context_str),
+        )
+
+        final_prompt_for_llm = construire_prompt(prompt, context_str)
+
+        logfire.info(
+            "Prompt généré",
+            longueur=len(final_prompt_for_llm),
+        )
+
+        messages_for_api = [
+            ChatMessage(role="user", content=final_prompt_for_llm)
+        ]
+
+        response_content = generer_reponse(messages_for_api)
+
+        logfire.info(
+            "Réponse générée",
+            longueur=len(response_content),
+        )
+        logger.info("Route choisie : RAG (reports)")
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=response_content,
+            search_results=search_results,
+            context_str=context_str,
+            final_prompt_for_llm=final_prompt_for_llm,
+            messages_for_api=[
+                {"role": msg.role, "content": msg.content}
+                for msg in messages_for_api
+            ],
+            route_used="RAG",
+            sql_success=False,
+        )
+
+        return result.model_dump()
+
+    # =========================================================
+    # Questions subjectives globales : refus
+    # =========================================================
+    if is_subjective_question(prompt):
+        logger.info("Question subjective globale détectée : %s", prompt)
+
+        result = RagPipelineOutput(
+            question=prompt,
+            answer=build_refusal_answer(prompt),
+            search_results=[],
+            context_str="",
+            final_prompt_for_llm="",
+            messages_for_api=[],
+            route_used="REFUS",
+            sql_success=False,
+        )
+        logger.info("Route choisie : REFUS_SUBJECTIVE")
+        return result.model_dump()
+
+    # =========================================================
+    # Pipeline RAG classique
+    # =========================================================
     try:
         logger.info("Recherche de contexte pour la question: '%s' avec k=%s", prompt, k)
         search_results = vector_store_manager.search(prompt, k=k)

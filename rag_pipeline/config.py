@@ -152,6 +152,12 @@ RÈGLES IMPORTANTES :
    - factuelles
    - sans blabla inutile
 
+7. Cas particulier — mentions dans les discussions :
+   - Si la question demande un classement, une fréquence ou une mesure quantitative (ex : "les joueurs les plus mentionnés"),
+     tu ne dois PAS produire de classement exact sauf si le contexte le permet clairement.
+   - Dans ce cas, indique plutôt quels noms apparaissent dans les extraits disponibles.
+   - Précise toujours que ce n’est pas exhaustif.
+
 ---
 
 CONTEXTE :
@@ -166,6 +172,35 @@ QUESTION :
 
 RÉPONSE :
 """
+SQL_GENERATION_PROMPT_TEMPLATE = """
+Tu es un assistant expert en SQL PostgreSQL.
+
+Ta tâche est de générer une requête SQL valide à partir d'une question utilisateur.
+
+{schema_context}
+
+Exemples :
+{examples}
+
+Contraintes :
+- Génère uniquement du SQL
+- Utilise uniquement SELECT
+- N'utilise jamais INSERT, UPDATE, DELETE, DROP, ALTER, CREATE ou TRUNCATE
+- N'utilise jamais SELECT *
+- Utilise des JOIN explicites si nécessaire
+- Ajoute toujours LIMIT si la requête peut retourner plusieurs lignes
+- Utilise uniquement les tables et colonnes décrites dans le schéma
+- Si la question demande une comparaison entre deux profils extrêmes (ex: meilleur scoreur vs meilleur passeur), identifie d'abord chaque joueur avec une sous-requête ou un CTE.
+- Si la question est trop ambiguë pour produire une requête fiable, retourne une requête SQL simple de comparaison entre les leaders concernés.
+- N'invente jamais de colonnes qui ne figurent pas dans le schéma.
+- Pour les questions sur les joueurs les plus mentionnés dans Reddit ou dans les reports, utiliser la table reports et la colonne related_player_names.
+- Pour agréger related_player_names, utiliser string_to_array(..., ',') puis unnest et TRIM avant GROUP BY.
+
+Question utilisateur :
+{question}
+
+SQL :
+""".strip()
 
 SQL_SYNTHESIS_PROMPT_TEMPLATE = """
 Tu es un assistant expert NBA.
@@ -184,7 +219,6 @@ Ta mission :
 
 Réponse :
 """
-
 
 # Paramètres modèle
 
