@@ -13,6 +13,7 @@ MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 if not MISTRAL_API_KEY:
     print("⚠️ Attention: MISTRAL_API_KEY non définie dans le fichier .env")
 
+API_URL = "http://127.0.0.1:8000/ask"
 # ======================================================
 #  Modèles
 # ======================================================

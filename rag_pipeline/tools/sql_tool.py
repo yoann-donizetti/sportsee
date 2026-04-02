@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 # DB
 # =========================================================
 
-engine = create_engine(DATABASE_URL_LLM)
+def get_engine():
+    """Instancie et retourne le moteur SQLAlchemy."""
+    return create_engine(DATABASE_URL_LLM)
 
 
 
@@ -66,6 +68,7 @@ def run_sql_query(query: str) -> List[Dict[str, Any]]:
     """Exécute une requête SQL sécurisée."""
     safe_query = validate_sql_query(query)
 
+    engine = get_engine()
     with engine.begin() as conn:
         result = conn.execute(text(safe_query))
         rows = result.fetchall()
