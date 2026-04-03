@@ -13,6 +13,8 @@
 ## Table des matières
 
 - [Fonctionnalités](#fonctionnalités)
+- [Extraction et parsing des documents](#extraction-et-parsing-des-documents)
+- [Comparaison OCR](#comparaison-ocr)
 - [Architecture du système](#architecture-du-système)
 - [API REST](#api-rest)
 - [Base de données (PostgreSQL)](#-base-de-données-postgresql)
@@ -61,8 +63,68 @@ L’objectif est de construire un système capable de :
 - **Dataset de test structuré** (questions simples, complexes, comparatives, bruitées, non répondables)
 - **Validation des données avec Pydantic**
 - **Observabilité avec Logfire + logging structuré**
+- **Extraction OCR avancée** avec DocStrange (Nanonets)
+- **Fallback OCR local** avec EasyOCR
+- **Parsing structuré des threads Reddit** (post + commentaires + hiérarchie)
+- **Comparaison des méthodes OCR** (DocStrange vs EasyOCR)
 
 ---
+
+
+
+## Extraction et parsing des documents
+
+Le système intègre une pipeline avancée de traitement des documents, notamment pour les rapports Reddit au format PDF.
+
+### Extraction
+
+Deux méthodes sont utilisées :
+
+- **DocStrange (Nanonets OCR)**
+  - extraction structurée (JSON riche)
+  - récupération des métadonnées (post, commentaires, structure)
+  - meilleure qualité pour les documents complexes
+
+- **EasyOCR (fallback local)**
+  - utilisé en cas d’échec de DocStrange
+  - extraction brute de texte
+
+### Parsing
+
+Les données extraites sont ensuite transformées via un parser dédié :
+
+- reconstruction du **post principal**
+- extraction des **commentaires**
+- gestion de la **hiérarchie (replies)**
+- suppression du bruit (sponsored content, UI, etc.)
+
+### Objectif
+
+- améliorer la qualité du retrieval
+- réduire le bruit dans le vector store
+- structurer les données pour un meilleur RAG
+
+---
+## Comparaison des méthodes OCR
+
+Un script permet de comparer automatiquement les performances entre DocStrange et EasyOCR :
+
+```bash
+python -m scripts.compare_ocr
+```
+**Sorties générées** :
+- JSON brut DocStrange
+- Texte reconstruit DocStrange
+- Texte EasyOCR
+- métriques simples :
+- longueur du texte
+- nombre de blocs
+- ratio DocStrange / EasyOCR
+
+**Objectif** : 
+- valider la qualité d’extraction
+- choisir la meilleure méthode
+- détecter les cas d’échec OCR
 
 
 
@@ -117,7 +179,12 @@ Le système s’appuie sur un pipeline structuré en plusieurs étapes :
    - scoring avec RAGAS ;
    - suivi des performances métier et des refus.
 
+
+
 ---
+
+
+
 
 ### Vision du système final
 
@@ -558,9 +625,20 @@ sportsee/
 │   └── scripts/
 │       └── evaluate_ragas.py     # Script principal de lancement RAGAS
 │
-├── utils/                        # Fonctions utilitaires partagées
-│   ├── data_loader.py            # Chargement et parsing multi-format (PDF, OCR, Excel, TXT, CSV…)
-│   └── logging_config.py         # Configuration centralisée du logging
+├── utils/                        
+│   ├── data_loader.py            # Orchestration globale du chargement et extraction multi-format
+│   ├── logging_config.py         # Configuration centralisée du logging
+│
+│   ├── extractors/               # Extraction brute des données
+│   │   ├── pdf.py                # Extraction PDF standard (PyPDF2)
+│   │   ├── ocr_easy.py           # OCR local EasyOCR (fallback robuste)
+│   │   ├── ocr_docstrange.py     # OCR avancé via API DocStrange (Nanonets)
+│   │   └── file_types.py         # CSV, Excel, TXT, DOCX
+│
+│   ├── chunking/                 # Découpage des documents pour le RAG
+│   │   └── reddit_chunker.py     # Chunking spécifique des documents Reddit
+│   ├── parsers/                  # Transformation métier
+│   │   └── reddit_parser.py      # Parsing structuré des threads Reddit
 │
 ├── docs/                         # Documentation et rapports
 │   ├── rapport_ragas_baseline.md # Rapport d’analyse de la baseline RAGAS
@@ -574,6 +652,8 @@ sportsee/
 ├── vector_db/                    # Index vectoriel FAISS généré automatiquement
 │   ├── document_chunks.pkl       # Chunks de documents indexés (pickle)
 │   └── faiss_index.idx           # Fichier d’index utilisé pour le retrieval
+├── scripts/
+│   └── compare_ocr.py            # Script de comparaison DocStrange vs EasyOCR
 ```
 ---
 
