@@ -32,26 +32,24 @@ from utils.logging_config import setup_logging
 logger = logging.getLogger(__name__)
 
 
-
-
 # =========================================================
 # Texte
 # =========================================================
 
 def clean_report_text(text: str) -> str:
-    """Nettoie un texte OCR / PDF pour améliorer le retrieval.
-    argument :
-        - text : le texte brut extrait du PDF / OCR
-    retour :le texte nettoyé, prêt à être inséré dans la base
-    fonctionnement :
-        - remplace les retours à la ligne par des espaces
-        - supprime les caractères invisibles et les puces
-        - supprime les URLs
-        - supprime les dates / heures OCR
-        - supprime les motifs de bruit fréquents (UI Reddit, pagination, etc.)
-        - filtre les lignes trop courtes, trop longues, ou avec peu de lettres
-        - supprime les phrases répétées
+    """Nettoie un texte de report pour améliorer le retrieval.
 
+    Argument :
+        - text : texte extrait du document
+
+    Retour :
+        - texte nettoyé, prêt à être inséré dans la base
+
+    Fonctionnement :
+        - normalise les retours à la ligne
+        - supprime certains bruits OCR / UI
+        - conserve les marqueurs structurants utiles
+        - conserve la structure du texte pour le retrieval
     """
     if not text:
         return ""
@@ -62,17 +60,27 @@ def clean_report_text(text: str) -> str:
     text = text.replace("·", " ")
     text = text.replace("|", " ")
 
-    # Suppression URLs
+    # Suppression URLs brutes
     text = re.sub(r"https?://\S+", " ", text)
     text = re.sub(r"www\.\S+", " ", text)
 
     # Suppression dates / heures OCR
     text = re.sub(r"\b\d{2}/\d{2}/\d{4}\s+\d{2}[:.]\d{2}\b", " ", text)
 
-    # Suppression pagination
+    # Suppression pagination OCR
     text = re.sub(r"\b\d+\s*/\s*\d+\b", " ", text)
 
-    # Suppression bruit Reddit / OCR
+    # Marqueurs utiles à conserver
+    protected_markers = {
+        "TITLE:",
+        "SUBREDDIT:",
+        "MAIN POST:",
+        "COMMENTS:",
+        "KEY POINTS:",
+        "PLAYER STATS:",
+        "AUTHOR:",
+    }
+
     noise_patterns = [
         r"Accéder au contenu principal",
         r"Se connecter",
@@ -88,30 +96,14 @@ def clean_report_text(text: str) -> str:
         r"Contrat d'utilisation",
         r"Tous droits réservés",
 
-        # Reddit / UI
-        r"upvotes?",
-        r"commentaires?",
-        r"Discussions connexes",
-        r"Afficher plus de commentaires",
-        r"Comm\. du top 1%",
-        r"Comm\. du 1%",
-        r"Comm; du top 1%",
-        r"Comm; du 1%",
-        r"r/nba",
-        r"rInba",
-        r"r/NBATalk",
-        r"r/thefinals",
-
-        # OCR bruit fréquent
+        # OCR / UI Reddit
         r"lcommentsl",
         r"\bilya\s+\d+\s*[mjau]\b",
         r"\bil y a\s+\d+\s*[mjau]\b",
 
-        # URLs / tracking
+        # Tracking / pub
         r"reddit\.com\S*",
         r"doubleclick\.net\S*",
-
-        # pubs / sponsors
         r"Sponsorisé\(e\)",
         r"En savoir plus",
         r"Télécharger",
@@ -134,58 +126,46 @@ def clean_report_text(text: str) -> str:
         if not line:
             continue
 
-        if len(line) < 4:
+        if line in protected_markers:
+            cleaned_lines.append(line)
             continue
 
-        if len(line) > 350:
+        if len(line) < 2:
+            continue
+
+        if len(line) > 1500:
             continue
 
         if re.fullmatch(r"[\W_]+", line):
             continue
 
         letters = sum(c.isalpha() for c in line)
-        if letters < 3:
+        if letters < 2:
             continue
 
         cleaned_lines.append(line)
 
-    # filtre qualité OCR
     filtered_lines = []
     for line in cleaned_lines:
+        if line in protected_markers:
+            filtered_lines.append(line)
+            continue
+
         words = line.split()
-        if len(words) < 3:
+        if len(words) < 2:
             continue
 
         alpha_ratio = sum(c.isalpha() for c in line) / max(len(line), 1)
-        if alpha_ratio < 0.55:
+        if alpha_ratio < 0.35:
             continue
 
         filtered_lines.append(line)
 
-    text = " ".join(filtered_lines)
-    text = re.sub(r"\s+", " ", text).strip()
+    text = "\n".join(filtered_lines)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
 
-    # suppression des phrases répétées
-    sentences = re.split(r"(?<=[.!?])\s+", text)
-
-    seen = set()
-    unique_sentences = []
-    for sentence in sentences:
-        s = sentence.strip()
-        if not s:
-            continue
-
-        key = s.lower()
-        if key in seen:
-            continue
-
-        seen.add(key)
-        unique_sentences.append(s)
-
-    text = " ".join(unique_sentences)
-    text = re.sub(r"\s+", " ", text).strip()
-
-    return text
+    return text.strip()
 
 
 # =========================================================
@@ -231,7 +211,6 @@ def build_team_aliases(teams: list[dict[str, str]]) -> dict[str, str]:
     - pour chaque équipe, ajoute le nom complet en alias
     - ajoute les parties du nom (ex: "warriors", "golden") comme alias
     - ajoute des alias manuels pour les équipes NBA (ex: "gsw" -> "warriors", "okc" -> "thunder", etc.)
-
     """
     alias_map: dict[str, str] = {}
 
@@ -320,19 +299,6 @@ def detect_team_codes(
     """Détecte les équipes mentionnées et retourne :
     - l'équipe principale
     - la liste des équipes détectées
-    arguments :
-        - text_content : le texte du report à analyser
-        - title : le titre du report (ex: le nom du PDF ou la source)
-        - team_aliases : un dictionnaire alias -> team_code construit à partir des équipes SQL
-    retour :
-            - le team_code de l'équipe principale (celle la plus mentionnée dans le texte et le titre
-            avec un score pondéré), ou None si aucune équipe détectéee
-            - la liste des team_codes détectés, ordonnée par score décroissant
-    fonctionnement :
-        - pour chaque alias d'équipe, compte le nombre d'occurrences dans le texte
-        - ajoute un score pondéré si l'alias est mentionné dans le titre ou dans les 500 premiers caractères du texte
-        - retourne l'équipe avec le score le plus élevé comme équipe principale, et la liste des équipes détectées ordonnée par score
-
     """
     text_lower = text_content.lower()
     title_lower = (title or "").lower()
@@ -375,17 +341,6 @@ def detect_player_names(
     """Détecte les joueurs mentionnés et retourne :
     - le joueur principal
     - la liste des joueurs détectés
-    arguments :
-        - text_content : le texte du report à analyser
-        - title : le titre du report (ex: le nom du PDF ou la source)
-        - player_aliases : un dictionnaire alias -> nom complet construit à partir des joueurs SQL
-    retour :
-        - le nom complet du joueur principal (celui la plus mentionné dans le texte et le titre avec un score pondéré), ou None si aucun joueur détecté
-        - la liste des noms complets des joueurs détectés, ordonnée par score décroissant
-    fonctionnement :
-        - pour chaque alias de joueur, compte le nombre d'occurrences dans le texte
-        - ajoute un score pondéré si l'alias est mentionné dans le titre ou dans les 500 premiers caractères du texte
-        - retourne le joueur avec le score le plus élevé comme joueur principal, et la liste des joueurs détectés ordonnée par score
     """
     text_lower = text_content.lower()
     title_lower = (title or "").lower()
@@ -429,22 +384,12 @@ def extract_report_record(
     team_aliases: dict[str, str],
     player_aliases: dict[str, str],
 ) -> Optional[dict[str, Any]]:
-    """Construit un enregistrement prêt à être inséré dans reports.
-    argument :
-    - doc : un dictionnaire représentant un document chargé par le data_loader, avec au moins les clés "metadata" (contenant "filename" et "source") et "page_content" (le texte extrait)
-    - team_aliases : un dictionnaire alias -> code d'équipe construit à partir des équipes SQL
-    - player_aliases : un dictionnaire alias -> nom complet construit à partir des joueurs SQL
-    retour :
-    - un dictionnaire représentant l'enregistrement à insérer dans reports, ou None si le document est ignoré
-    fonctionnement :
-    - nettoie le texte extrait du document
-    - détecte les équipes et joueurs mentionnés dans le texte
-    - construit un dictionnaire avec les champs nécessaires pour l'insertion dans la table reports
-    """
-
+    """Construit un enregistrement prêt à être inséré dans reports."""
     metadata = doc.get("metadata", {})
+
     filename = str(metadata.get("filename", ""))
     source = str(metadata.get("source", ""))
+    title = str(metadata.get("title", "")) or source or filename
 
     raw_content = str(doc.get("page_content", ""))
     content = clean_report_text(raw_content)
@@ -453,12 +398,12 @@ def extract_report_record(
         logger.warning("Report ignoré car trop court : %s", filename)
         return None
 
-    main_team, all_teams = detect_team_codes(content, source, team_aliases)
-    main_player, all_players = detect_player_names(content, source, player_aliases)
+    main_team, all_teams = detect_team_codes(content, title, team_aliases)
+    main_player, all_players = detect_player_names(content, title, player_aliases)
 
     return {
         "source_file": filename,
-        "title": source,
+        "title": title,
         "report_text": content,
         "related_team_code": main_team,
         "related_player_name": main_player,
@@ -480,7 +425,6 @@ def insert_reports(engine: Engine, reports: list[dict[str, Any]]) -> None:
     fonctionnement :
     - si la liste est vide, log un avertissement et retourne sans faire d'insertion
     - sinon, exécute une requête d'insertion en utilisant SQLAlchemy text() pour insérer tous les reports en une seule requête
-
     """
     if not reports:
         logger.warning("Aucun report à insérer.")

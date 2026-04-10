@@ -39,6 +39,10 @@ from .config import (
 
 logger = logging.getLogger(__name__)
 
+# Sécurité supplémentaire pour éviter d'envoyer des textes trop longs
+# au modèle d'embedding Mistral.
+MAX_EMBED_TEXT_CHARS = 3000
+
 
 class VectorStoreManager:
     """Gère la création, le chargement et la recherche dans un index FAISS."""
@@ -169,7 +173,15 @@ class VectorStoreManager:
         for i in range(0, len(chunks), EMBEDDING_BATCH_SIZE):
             batch_num = (i // EMBEDDING_BATCH_SIZE) + 1
             batch_chunks = chunks[i : i + EMBEDDING_BATCH_SIZE]
-            texts_to_embed = [chunk["text"] for chunk in batch_chunks]
+
+            # Sécurité : on tronque les textes trop longs avant envoi à l'API
+            # pour éviter les erreurs de dépassement de tokens.
+            texts_to_embed = [
+                chunk["text"][:MAX_EMBED_TEXT_CHARS]
+                if len(chunk["text"]) > MAX_EMBED_TEXT_CHARS
+                else chunk["text"]
+                for chunk in batch_chunks
+            ]
 
             logger.info(
                 "Traitement du lot %s/%s (%s chunks)",
@@ -192,11 +204,8 @@ class VectorStoreManager:
                     batch_num,
                     e,
                 )
-                logger.error(
-                    "Détails: Status Code=%s, Message=%s",
-                    e.status_code,
-                    e.message,
-                )
+                logger.error("Détails erreur Mistral: %s", str(e))
+                return None
 
             except Exception as e:
                 logger.error(
@@ -214,7 +223,7 @@ class VectorStoreManager:
                     logger.error(
                         "Impossible de déterminer la dimension des embeddings, saut du lot."
                     )
-                    continue
+                    return None
 
                 logger.warning(
                     "Ajout de %s vecteurs nuls de dimension %s pour le lot échoué.",
@@ -241,7 +250,11 @@ class VectorStoreManager:
             return
 
         # 1. Découpage en chunks
+        # Même si certains documents semblent déjà chunkés, on applique
+        # systématiquement un redécoupage pour sécuriser la taille des textes
+        # avant génération des embeddings.
         self.document_chunks = self._split_documents_to_chunks(documents)
+
         if not self.document_chunks:
             logger.error(
                 "Le découpage n'a produit aucun chunk. Impossible de construire l'index."
@@ -413,11 +426,7 @@ class VectorStoreManager:
                 "Erreur API Mistral lors de la génération de l'embedding de la requête: %s",
                 e,
             )
-            logger.error(
-                "Détails: Status Code=%s, Message=%s",
-                e.status_code,
-                e.message,
-            )
+            logger.error("Détails erreur Mistral: %s", str(e))
             return []
 
         except Exception as e:

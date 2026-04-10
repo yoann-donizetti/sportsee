@@ -177,3 +177,13 @@ pytest
 # Framework de tests :
 # - exécution des tests unitaires
 # - validation des endpoints API
+
+# =========================================================
+# Visualisation / PlotTool
+# =========================================================
+matplotlib
+# Génération de graphiques dynamiques :
+# - histogrammes
+# - courbes
+# - camemberts
+# - export PNG / base64 pour le PlotTool
