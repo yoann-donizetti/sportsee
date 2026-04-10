@@ -8,5 +8,6 @@ class AskRequest(BaseModel):
 class AskResponse(BaseModel):
     question: str
     answer: str
-    route_used: str
-    sql_success: bool
+    route_used: str = ""
+    sql_success: bool = False
+    plot_path: str = ""

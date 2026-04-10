@@ -10,6 +10,8 @@ load_dotenv()
 
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 
+DOCSTRANGE_API_KEY=os.getenv("DOCSTRANGE_API_KEY")
+
 if not MISTRAL_API_KEY:
     print("⚠️ Attention: MISTRAL_API_KEY non définie dans le fichier .env")
 
@@ -50,7 +52,7 @@ EMBEDDING_BATCH_SIZE = 32
 #  Recherche
 # ======================================================
 
-SEARCH_K = 5
+SEARCH_K = 7
 DEFAULT_MIN_SCORE = None
 
 # ======================================================
@@ -98,7 +100,7 @@ RAGAS_RESULTS_CSV_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas_results.csv")
 RAGAS_SUMMARY_JSON_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas_summary.json")
 RAGAS_LOG_FILE = os.path.join(RAGAS_RESULTS_DIR, "ragas.log")
 
-RAGAS_SEARCH_K = 5
+RAGAS_SEARCH_K = 7
 
 # ======================================================
 #  Data Loader / Parsing
@@ -141,23 +143,30 @@ Ton objectif est de fournir des réponses fiables, basées uniquement sur les do
 RÈGLES IMPORTANTES :
 
 1. Tu dois répondre UNIQUEMENT à partir du contexte fourni.
-2. Si l'information n'est pas présente dans le contexte, tu dois REFUSER de répondre.
-3. Tu ne dois JAMAIS inventer de statistiques ou de faits.
-4. Si la question est imprécise, ambiguë ou bruitée, tu dois refuser.
-5. Les données disponibles sont statiques (snapshot).
+2. Tu dois t’appuyer explicitement sur les informations présentes dans le contexte pour répondre.
+3. Tu ne dois JAMAIS utiliser de connaissances externes.
+4. Tu ne dois JAMAIS inventer de statistiques ou de faits.
+
+5. Si le contexte ne contient PAS clairement l'information demandée, tu dois répondre EXACTEMENT :
+"Je ne trouve pas cette information dans les données disponibles."
+
+6. Si la question est imprécise, ambiguë ou bruitée, tu dois refuser avec cette même phrase.
+
+7. Les données disponibles sont statiques (snapshot).
    Tu ne dois PAS faire d'analyse temporelle (évolution, derniers matchs, tendances).
    Si la question nécessite une dimension temporelle, tu dois refuser.
-6. Tes réponses doivent être :
+
+8. Tes réponses doivent être :
    - claires
    - courtes
    - factuelles
-   - sans blabla inutile
+   - directement exploitables
 
-7. Cas particulier — mentions dans les discussions :
-   - Si la question demande un classement, une fréquence ou une mesure quantitative (ex : "les joueurs les plus mentionnés"),
+9. Cas particulier — mentions dans les discussions :
+   - Si la question demande un classement ou une fréquence (ex : "les joueurs les plus mentionnés"),
      tu ne dois PAS produire de classement exact sauf si le contexte le permet clairement.
-   - Dans ce cas, indique plutôt quels noms apparaissent dans les extraits disponibles.
-   - Précise toujours que ce n’est pas exhaustif.
+   - Tu dois uniquement citer les noms présents dans le contexte.
+   - Tu dois préciser que l'information n'est pas exhaustive.
 
 ---
 

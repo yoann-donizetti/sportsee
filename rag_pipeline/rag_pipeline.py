@@ -47,6 +47,13 @@ from rag_pipeline.router import (
     is_subjective_question,
     is_reports_question,
     build_refusal_answer,
+    is_plot_question,
+)
+
+from rag_pipeline.tools.plot_tool import build_plot, PlotToolInput
+from rag_pipeline.tools.plot_utils import (
+    sql_rows_to_plot_data,
+    build_plot_title,
 )
 
 from rag_pipeline.tools.sql_tool import (
@@ -234,6 +241,46 @@ def poser_question(
 
             sql_results = payload["rows"]
             sql_query = payload["sql_query"]
+
+            # =========================================================
+            # Cas SQL + Plot
+            # =========================================================
+            chart_type = is_plot_question(prompt)
+            if chart_type:
+                logger.info("Question graphique détectée sur route SQL : %s", prompt)
+
+                plot_data = sql_rows_to_plot_data(sql_results)
+
+                if plot_data:
+                    chart_type = is_plot_question(prompt)
+                    plot_payload = PlotToolInput(
+                        chart_type=chart_type,
+                        title=build_plot_title(prompt),
+                        x_label="Catégorie",
+                        y_label="Valeur",
+                        data=plot_data,
+                        return_base64=False,
+                    )
+
+                    plot_result = build_plot(plot_payload)
+                    sql_answer = synthesize_sql_answer(prompt, sql_results)
+                    sql_context = sql_rows_to_context(prompt, sql_results)
+
+                    result = RagPipelineOutput(
+                        question=prompt,
+                        answer=sql_answer,
+                        search_results=[],
+                        context_str=sql_context,
+                        final_prompt_for_llm=sql_query,
+                        messages_for_api=[],
+                        route_used="SQL",
+                        sql_success=True,
+                        plot_path=plot_result.get("file_path", ""),
+                    )
+
+                    logger.info("Route choisie : SQL + PLOT")
+                    return result.model_dump()
+
 
             sql_answer = synthesize_sql_answer(prompt, sql_results)
             sql_context = sql_rows_to_context(prompt, sql_results)
