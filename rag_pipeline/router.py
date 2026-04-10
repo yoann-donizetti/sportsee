@@ -49,28 +49,35 @@ def is_sql_question(question: str) -> bool:
 
     # Indices de métriques mesurables
     metric_keywords = [
-        "points",
-        "rebonds",
-        "rebond",
-        "passes",
-        "passes décisives",
-        "passes decisives",
-        "pourcentage",
-        "fg%",
-        "3 points",
-        "3pt",
-        "reb",
-        "ast",
-        "pts",
-        "rating",
-        "offrtg",
-        "defrtg",
-        "netrtg",
-        "efficacité",
-        "efficacite",
-        "performance",
-        "performances",
-    ]
+            "points",
+            "point",
+            "rebonds",
+            "rebond",
+            "passes",
+            "passes décisives",
+            "passes decisives",
+            "pourcentage",
+            "fg%",
+            "3 points",
+            "3pt",
+            "reb",
+            "ast",
+            "pts",
+            "rating",
+            "offrtg",
+            "defrtg",
+            "netrtg",
+            "efficacité",
+            "efficacite",
+            "performance",
+            "performances",
+            "scoreur",
+            "scoreurs",
+            "marqueur",
+            "marqueurs",
+            "score",
+            "scoring",
+        ]
 
     # Indices d'opérations analytiques
     operation_keywords = [
@@ -92,21 +99,41 @@ def is_sql_question(question: str) -> bool:
         "difference",
         "comparaison",
         "compare",
+        "comparer",
         "complet",
         "plus complet",
+        "top 5",
+        "top 10",
+        "leader",
+        "leaders",
     ]
 
     # Cas métiers explicites à forcer en SQL
     sql_patterns = [
-        "plus complet entre points, rebonds et passes",
-        "plus complet entre points rebonds et passes",
-        "différence de performance entre les joueurs les plus scoreurs et les meilleurs passeurs",
-        "difference de performance entre les joueurs les plus scoreurs et les meilleurs passeurs",
-        "joueurs les plus scoreurs et les meilleurs passeurs",
-        "combine le plus de points et de passes",
-        "combine le plus de points et de passes décisives",
-        "combine le plus de points et de passes decisives",
-    ]
+            "plus complet entre points, rebonds et passes",
+            "plus complet entre points rebonds et passes",
+            "différence de performance entre les joueurs les plus scoreurs et les meilleurs passeurs",
+            "difference de performance entre les joueurs les plus scoreurs et les meilleurs passeurs",
+            "joueurs les plus scoreurs et les meilleurs passeurs",
+            "combine le plus de points et de passes",
+            "combine le plus de points et de passes décisives",
+            "combine le plus de points et de passes decisives",
+            "top 5 des meilleurs scoreurs",
+            "top 10 des meilleurs scoreurs",
+            "meilleurs scoreurs",
+            "meilleurs marqueurs",
+            "top 5 des marqueurs",
+            "top 10 des marqueurs",
+            "joueurs avec le plus de points",
+            "joueurs avec le plus de rebonds",
+            "joueurs avec le plus de passes",
+            "compare les points de",
+            "comparaison des points de",
+            "compare les rebonds de",
+            "comparaison des rebonds de",
+            "compare les passes de",
+            "comparaison des passes de",
+        ]
     if any(p in q for p in sql_patterns):
         return True
 
@@ -260,3 +287,64 @@ def is_reports_aggregation_question(question: str) -> bool:
     ]
 
     return any(p in q for p in patterns)
+
+def is_plot_question(question: str) -> str | None:
+    q = question.lower().strip()
+
+    # =========================
+    # EVOLUTION → LINE
+    # =========================
+    if any(p in q for p in [
+        "évolution",
+        "evolution",
+        "progression",
+        "au fil du temps",
+        "par match",
+        "par saison",
+    ]):
+        return "line"
+
+    # =========================
+    # COMPARAISON → BAR
+    # =========================
+    if any(p in q for p in [
+        "compare",
+        "comparer",
+        "comparaison",
+        "vs",
+        "entre",
+    ]):
+        return "bar"
+
+    # =========================
+    # CLASSEMENT / TOP → BAR
+    # =========================
+    if any(p in q for p in [
+        "top",
+        "classement",
+        "meilleurs",
+        "plus de",
+        "moins de",
+        "leaders",
+        "scoreurs",
+        "scoreur",
+        "marqueurs",
+        "marqueur",
+        "meilleurs scoreurs",
+        "meilleurs marqueurs",
+    ]):
+        return "bar"
+
+    # =========================
+    # EXPLICITE → BAR
+    # =========================
+    if any(p in q for p in [
+        "graphique",
+        "graphe",
+        "courbe",
+        "histogramme",
+        "camembert",
+    ]):
+        return "bar"
+
+    return None

@@ -50,8 +50,13 @@ if prompt := st.chat_input(f"Posez votre question sur la {NAME}..."):
             response = result["answer"]
             route_used = result.get("route_used", "")
             sql_success = result.get("sql_success", False)
+            plot_path = result.get("plot_path", "")
 
             placeholder.write(response)
+
+            if plot_path:
+                _ = st.image(plot_path, caption="Graphique généré automatiquement")
+
             st.caption(f"Route utilisée : {route_used} | SQL success : {sql_success}")
 
             logger.info("Réponse générée (longueur=%s caractères)", len(response))

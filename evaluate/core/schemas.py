@@ -49,3 +49,4 @@ class RagPipelineOutput(BaseModel):
     messages_for_api: List[dict]
     route_used: str = ""
     sql_success: bool = False
+    plot_path: str = ""

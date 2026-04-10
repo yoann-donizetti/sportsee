@@ -80,6 +80,7 @@ def ask(payload: AskRequest):
             answer=result["answer"],
             route_used=result.get("route_used", ""),
             sql_success=result.get("sql_success", False),
+            plot_path=result.get("plot_path", ""),
         )
 
     except Exception as e:

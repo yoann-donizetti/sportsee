@@ -48,7 +48,7 @@ L’objectif est de construire un système capable de :
 
 ---
 
-## Table des matières
+
 
 
 
@@ -374,7 +374,6 @@ curl -X POST "http://127.0.0.1:8000/ask" \
 
 ### Interface Streamlit
 
-### Interface Streamlit
 
 L’interface Streamlit agit comme un client de l’API REST :
 
