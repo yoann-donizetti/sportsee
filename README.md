@@ -11,7 +11,7 @@
 # NBA Analyst AI — Assistant RAG avec Mistral
 
 ## Table des matières
-
+- [Lancement rapide](#lancement-rapide)
 - [Fonctionnalités](#fonctionnalités)
 - [Extraction et parsing des documents](#extraction-et-parsing-des-documents)
 - [Comparaison OCR](#comparaison-ocr)
@@ -48,7 +48,31 @@ L’objectif est de construire un système capable de :
 
 ---
 
+## Lancement rapide
 
+Le mode d’emploi complet est disponible dans la section [Exécution du projet](#exécution-du-projet).
+
+Pour lancer rapidement le système dans l’ordre recommandé :
+
+```bash
+# 1. Initialiser la base
+psql -U postgres -f database/init_db.sql
+
+# 2. Charger les données Excel
+python -m database.load_excel_to_db
+
+# 3. Charger les rapports PDF / Reddit
+python -m database.load_reports
+
+# 4. Construire l’index FAISS
+python -m indexer
+
+# 5. Lancer l’API
+uvicorn api.main:app --reload
+
+# 6. Lancer l’interface Streamlit
+streamlit run MistralChat.py
+```
 
 
 
@@ -762,63 +786,41 @@ DB_PASSWORD=your_password
 
 ## Exécution du projet
 ### 1. Initialiser la base de données
-```bash
 psql -U postgres -f database/init_db.sql
-```
 
-### 2. Ajouter des documents
+### 2. Ajouter les fichiers sources
+Placez les fichiers dans le dossier inputs/.
+Formats supportés :
+•	PDF
+•	TXT
+•	DOCX
+•	CSV
+•	Excel (.xlsx, .xls)
 
-Placez vos documents dans le dossier `inputs/`. Les formats supportés sont :
-- PDF
-- TXT
-- DOCX
-- CSV
-- Excel (.xlsx, xls)
-
-Les documents peuvent être organisés dans des sous-dossiers pour faciliter le classement des sources.
-
-###  3. Charger les données dans PostgreSQL
-
-Données structurées (Excel)
+### 3. Charger les données structurées dans PostgreSQL
 ```bash
 python -m database.load_excel_to_db
 ```
-
-Données textuelles (PDF / Reddit)
-
+### 4. Charger les rapports textuels dans PostgreSQL
 ```bash
 python -m database.load_reports
 ```
-
-
-### 4. Indexer les documents
-
-Exécutez le script d’indexation pour parser les fichiers, créer les chunks, générer les embeddings et construire l’index FAISS :
-
+### 5. Construire l’index vectoriel FAISS
 ```bash
 python -m indexer
 ```
-
-Ce script va :
-1. Charger les documents depuis le dossier `inputs/`
-2. Découper les documents en chunks
-3. Générer des embeddings avec Mistral
-4. Créer un index FAISS pour la recherche sémantique
-5. Sauvegarder l'index et les chunks dans le dossier `vector_db/`
-
-### 5. Lancer l'application
-
+### 6. Lancer l’API FastAPI
+```bash
+uvicorn api.main:app --reload
+```
+### 7. Lancer l’interface Streamlit
 ```bash
 streamlit run MistralChat.py
 ```
 
-L'application sera accessible à l'adresse http://localhost:8501 dans votre navigateur.
-
-
-### 6. Lancer l'évaluation RAGAS 
-
+### 8. Lancer l’évaluation RAGAS
 ```bash
-python -m evaluate.scripts.evaluate_ragas
+python -m evaluation.run_ragas
 ```
 
 Les résultats sont générés dans le dossier `evaluate/results/` selon la version évaluée.
@@ -849,11 +851,10 @@ Le système est testé sur :
 
 ## Améliorations prévues
 
-- ajout d’une API REST pour exposer le système ;
 - amélioration des comparaisons complexes ;
 - ajout éventuel d’un score de confiance ;
 - amélioration du routing sur certains cas hybrides ;
-- enrichissement de l’évaluation pour les systèmes hybrides.
+- enrichissement de l’évaluation pour les systèmes hybrides ;
 
 ## Objectif
 Le système final vise à fournir des réponses fiables sur des données NBA en combinant :
