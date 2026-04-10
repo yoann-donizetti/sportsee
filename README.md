@@ -417,7 +417,7 @@ streamlit run MistralChat.py
 Par défaut, l’interface est accessible à l’adresse : [http://localhost:8501](http://localhost:8501)
 
 
-```
+
 
 ---
 
@@ -822,6 +822,7 @@ streamlit run MistralChat.py
 ```bash
 python -m evaluation.run_ragas
 ```
+
 
 Les résultats sont générés dans le dossier `evaluate/results/` selon la version évaluée.
 
